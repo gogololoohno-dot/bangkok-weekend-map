@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Auto-updates bangkok-today.html with the latest Timeout Bangkok weekend picks.
+Auto-updates index.html with the latest Timeout Bangkok weekend picks.
 Scheduled to run every Friday via Windows Task Scheduler.
 """
 
@@ -12,7 +12,7 @@ import anthropic
 from datetime import datetime, timedelta
 from pathlib import Path
 
-HTML_FILE = Path(__file__).parent / "bangkok-today.html"
+HTML_FILE = Path(__file__).parent / "index.html"
 TIMEOUT_URL = "https://www.timeout.com/bangkok/things-to-do/the-best-things-to-do-in-bangkok-this-weekend"
 
 HEADERS = {

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bangkok This Weekend</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; font-family:'Segoe UI',system-ui,sans-serif; background:#111827; color:#f9fafb; overflow:hidden; }
+body { display:flex; flex-direction:column; }
+
+header {
+  background:#1f2937; border-bottom:1px solid #374151;
+  padding:11px 18px; display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.htitle { font-size:1rem; font-weight:700; }
+.hsub { font-size:0.7rem; color:#9ca3af; }
+.badge { margin-left:auto; background:#f97316; color:#fff; font-size:0.65rem; font-weight:700; padding:3px 10px; border-radius:20px; }
+
+.filters {
+  background:#1f2937; border-bottom:1px solid #374151;
+  padding:7px 14px; display:flex; gap:5px; flex-wrap:wrap; align-items:center; flex-shrink:0;
+}
+.filters label { font-size:0.65rem; color:#6b7280; }
+.pill {
+  font-size:0.62rem; font-weight:600; padding:3px 9px; border-radius:20px;
+  border:1px solid #374151; background:#111827; color:#d1d5db; cursor:pointer; transition:all 0.15s;
+  user-select:none;
+}
+.pill:hover { border-color:#9ca3af; }
+.pill.on { color:#fff; }
+.pill[data-f="all"].on       { background:#f97316; border-color:#f97316; }
+.pill[data-f="art"].on       { background:#8b5cf6; border-color:#8b5cf6; }
+.pill[data-f="music"].on     { background:#3b82f6; border-color:#3b82f6; }
+.pill[data-f="pop-up"].on    { background:#ef4444; border-color:#ef4444; }
+.pill[data-f="film"].on      { background:#10b981; border-color:#10b981; }
+.pill[data-f="market"].on    { background:#f59e0b; border-color:#f59e0b; }
+.pill[data-f="aquarium"].on  { background:#06b6d4; border-color:#06b6d4; }
+.pill[data-f="nature"].on    { background:#22c55e; border-color:#22c55e; }
+.pill[data-f="nightlife"].on { background:#a855f7; border-color:#a855f7; }
+.pill[data-f="community"].on { background:#f43f5e; border-color:#f43f5e; }
+
+.layout { display:flex; flex:1; min-height:0; }
+
+aside {
+  width:310px; min-width:310px; overflow-y:auto;
+  background:#0f172a; border-right:1px solid #1e293b;
+}
+aside::-webkit-scrollbar { width:3px; }
+aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
+
+.card { border-bottom:1px solid #1e293b; cursor:pointer; transition:background 0.12s; }
+.card:hover { background:#1e293b; }
+.card.active { background:#1e293b; border-left:3px solid #f97316; }
+.card.hide { display:none; }
+.card-img { width:100%; height:110px; object-fit:cover; display:block; background:#1f2937; }
+.card-body { padding:9px 12px 11px; }
+.ctag {
+  display:inline-block; font-size:0.58rem; font-weight:700; padding:2px 7px; border-radius:10px;
+  text-transform:uppercase; letter-spacing:0.3px; margin-bottom:5px;
+}
+.tag-art       { background:#4c1d95; color:#c4b5fd; }
+.tag-music     { background:#1e3a8a; color:#93c5fd; }
+.tag-pop-up    { background:#7f1d1d; color:#fca5a5; }
+.tag-film      { background:#064e3b; color:#6ee7b7; }
+.tag-market    { background:#78350f; color:#fcd34d; }
+.tag-aquarium  { background:#0c4a6e; color:#67e8f9; }
+.tag-nature    { background:#14532d; color:#86efac; }
+.tag-nightlife { background:#2e1065; color:#e9d5ff; }
+.tag-community { background:#881337; color:#fda4af; }
+
+.card-title { font-size:0.8rem; font-weight:700; color:#f9fafb; margin-bottom:4px; line-height:1.3; }
+.card-meta { font-size:0.68rem; color:#94a3b8; display:flex; flex-direction:column; gap:3px; }
+.card-meta span { display:flex; align-items:flex-start; gap:4px; }
+.green { color:#4ade80; font-weight:600; }
+.amber { color:#fbbf24; font-weight:600; }
+.card-desc { font-size:0.72rem; color:#cbd5e1; margin-top:6px; line-height:1.6; }
+
+/* Map */
+#map-wrap { flex:1; position:relative; min-width:0; min-height:0; overflow:hidden; background:#1a2035; cursor:grab; }
+#map-wrap.dragging { cursor:grabbing; }
+#tile-layer { position:absolute; top:0; left:0; }
+#tile-layer img { position:absolute; width:256px; height:256px; display:block; image-rendering:auto; }
+#marker-layer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+.mpin {
+  position:absolute; pointer-events:all; cursor:pointer;
+  display:flex; align-items:center; gap:6px;
+  transform:translate(-50%,-50%);
+  transition:transform 0.15s;
+  z-index:10;
+  white-space:nowrap;
+}
+.mpin:hover { transform:translate(-50%,-50%) scale(1.05); z-index:20; }
+.mpin.hidden { display:none; }
+.mpin-dot {
+  width:34px; height:34px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; border:2.5px solid #fff;
+  box-shadow:0 2px 8px rgba(0,0,0,0.55);
+}
+.mpin-label {
+  background:rgba(15,23,42,0.85);
+  color:#f9fafb; font-size:0.62rem; font-weight:600;
+  padding:3px 7px; border-radius:6px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.5);
+  backdrop-filter:blur(4px);
+  line-height:1.3; max-width:150px; white-space:normal;
+  pointer-events:none;
+}
+
+/* Zoom controls */
+#zoom-btns { position:absolute; top:10px; right:10px; z-index:50; display:flex; flex-direction:column; gap:4px; }
+.zbtn {
+  width:32px; height:32px; background:#1f2937; border:1px solid #374151; color:#f9fafb;
+  font-size:1.1rem; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  user-select:none;
+}
+.zbtn:hover { background:#374151; }
+
+/* Popup */
+#popup {
+  position:absolute; z-index:100; background:#1f2937; border:1px solid #374151;
+  border-radius:10px; width:240px; box-shadow:0 8px 32px rgba(0,0,0,0.7);
+  display:none;
+}
+#popup img { width:100%; height:85px; object-fit:cover; border-radius:10px 10px 0 0; display:block; }
+#popup-body { padding:10px 12px 12px; }
+#popup-body h3 { font-size:0.78rem; font-weight:700; color:#f9fafb; margin-bottom:5px; }
+#popup-meta { font-size:0.65rem; color:#9ca3af; display:flex; flex-direction:column; gap:2px; }
+#popup-close {
+  position:absolute; top:6px; right:8px; background:rgba(0,0,0,0.6); color:#fff;
+  border:none; border-radius:50%; width:22px; height:22px; cursor:pointer;
+  font-size:0.75rem; display:flex; align-items:center; justify-content:center; z-index:10;
+}
+
+/* Attribution */
+#attr {
+  position:absolute; bottom:4px; right:6px; z-index:50;
+  font-size:0.55rem; color:#6b7280; background:rgba(15,23,42,0.8); padding:2px 5px; border-radius:3px;
+}
+#attr a { color:#6b7280; }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.3rem">🗺</span>
+  <div>
+    <div class="htitle">Bangkok This Weekend</div>
+    <div class="hsub">18 picks · Timeout Bangkok · Apr 18–19, 2026</div>
+  </div>
+  <div class="badge">LIVE</div>
+</header>
+
+<div class="filters">
+  <label>Filter: </label>
+  <span class="pill on" data-f="all">All 18</span>
+  <span class="pill" data-f="art">🎨 Art</span>
+  <span class="pill" data-f="music">🎵 Music</span>
+  <span class="pill" data-f="pop-up">⭐ Pop-Up</span>
+  <span class="pill" data-f="film">🎬 Film</span>
+  <span class="pill" data-f="market">🛍 Market</span>
+  <span class="pill" data-f="aquarium">🌊 Aquarium</span>
+  <span class="pill" data-f="nature">🌿 Nature</span>
+  <span class="pill" data-f="nightlife">🌙 Nightlife</span>
+  <span class="pill" data-f="community">🐾 Community</span>
+</div>
+
+<div class="layout">
+  <aside id="sidebar"></aside>
+
+  <div id="map-wrap">
+    <div id="tile-layer"></div>
+    <div id="marker-layer"></div>
+
+    <div id="zoom-btns">
+      <div class="zbtn" id="btn-in">+</div>
+      <div class="zbtn" id="btn-out">−</div>
+    </div>
+
+    <div id="popup">
+      <img id="popup-img" src="" alt="">
+      <button id="popup-close">✕</button>
+      <div id="popup-body">
+        <h3 id="popup-title"></h3>
+        <div id="popup-meta"></div>
+      </div>
+    </div>
+
+    <div id="attr"><a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap</a></div>
+  </div>
+</div>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────────────
+var A = [
+  { id:1,  title:"One Piece Pop-Up @ ICONSIAM",           cat:"pop-up",    e:"⭐", loc:"ICONSIAM, Charoennakhon",           lat:13.7247, lng:100.5136, time:"10:00–20:30 daily", until:"Until Oct 31",  price:"Free",            free:1, desc:"A massive 600 sq-m fan experience inside ICONSIAM. Walk through recreated sets from iconic arcs, find your wanted poster, collect stamps across 10 themed zones, and stand next to a towering 5-metre Gear 5 Luffy statue. Perfect for One Piece fans of any age — free to enter, food and merch available inside.", img:"https://media.timeout.com/images/106383451/750/562/image.jpg" },
+  { id:2,  title:"Saneh Art by Songkran Festival",         cat:"art",       e:"🎨", loc:"Lumpini Park, Pathumwan",           lat:13.7291, lng:100.5400, time:"10:00–20:00 daily", until:"Apr 16–30",     price:"Free",            free:1, desc:"Large-scale outdoor sculptures by some of Thailand's most celebrated contemporary artists, installed across the grounds of Lumpini Park. A post-Songkran moment of calm reflection — the works invite you to slow down and wander. Great for a morning stroll or golden-hour photos. Completely free, open daily.", img:"https://media.timeout.com/images/106394907/750/562/image.jpg" },
+  { id:3,  title:"Bartemp's Birthday Week",                cat:"nightlife", e:"🌙", loc:"Bar.Temp, Yaowarat (Chinatown)",    lat:13.7398, lng:100.5099, time:"21:00 onwards",     until:"Ends Apr 18",   price:"Check Instagram", free:0, desc:"The final night of Bar.Temp's week-long birthday celebration in the heart of Chinatown. Expect a curated lineup of house, techno, and experimental electronic music from both local heroes and international guests. The venue is known for its intimate atmosphere and serious sound system. Check their Instagram for door price and lineup.", img:"https://media.timeout.com/images/106296623/750/562/image.jpg" },
+  { id:4,  title:'Museum Pier — "Wind" Exhibition',        cat:"art",       e:"🎨", loc:"Museum Pier, Rattanakosin",          lat:13.7543, lng:100.4923, time:"10:00–18:00",       until:"Until Apr 30",  price:"Free",            free:1, desc:"Multidisciplinary artist Noo Monthip weaves together voice, music, fashion, and visual art under the gentle concept of 'wind' — something invisible yet deeply felt. Housed in the atmospheric Museum Pier along the Chao Phraya river, the exhibition explores memory, impermanence, and movement. A quiet, thoughtful escape from the city noise.", img:"https://media.timeout.com/images/106387480/750/562/image.jpg" },
+  { id:5,  title:"TagTEAMS 2026 — Sound Art Festival",     cat:"music",     e:"🎵", loc:"Bangkok Kunsthalle, Yaowarat",       lat:13.7395, lng:100.5065, time:"All day",           until:"Apr 17–19",     price:"฿300–฿1,000",    free:0, desc:"A rare gathering of 60+ international artists pushing the edges of sound and music. Expect acousmatic compositions played through high-end speaker arrays, live electroacoustic performances, and multimedia installations that challenge what 'listening' means. Held at Bangkok Kunsthalle in Yaowarat — one of the city's most exciting new art spaces.", img:"https://media.timeout.com/images/106394915/750/562/image.jpg" },
+  { id:6,  title:"Summer of Youth — Outdoor Film",         cat:"film",      e:"🎬", loc:"GalileOasis, Phaya Thai",            lat:13.7525, lng:100.5307, time:"19:00 Sat & Sun",   until:"Apr 18–19",     price:"฿250",            free:0, desc:"Two nights of outdoor cinema under the Bangkok sky. Saturday screens Billy Elliot — the story of a boy who defies expectations to become a dancer. Sunday brings The Breakfast Club, the ultimate '80s teen classic. GalileOasis is a relaxed rooftop-style venue; bring a cushion or grab a bean bag. Doors open at 6:30pm, film starts at 7pm.", img:"https://media.timeout.com/images/106394916/750/562/image.jpg" },
+  { id:7,  title:"24 Eyes of Hope — Free Pet Surgery",     cat:"community", e:"🐾", loc:"Thonglor Pet Hospital, Thonglor",   lat:13.7265, lng:100.5853, time:"Apply via Facebook", until:"Until Apr 30",  price:"Free (selected)", free:1, desc:"Thonglor Pet Hospital's CSR initiative is offering free cataract surgery for 12 lucky dogs and cats whose owners can't afford the procedure. If your pet has cataracts, submit their story along with photos via the hospital's Facebook page or LINE account. Selected animals will receive full care at no cost. Applications open until end of April.", img:"https://media.timeout.com/images/106394917/750/562/image.jpg" },
+  { id:8,  title:"Format BKK — The Untold Tracks",         cat:"music",     e:"🎵", loc:"Format BKK, Ari",                    lat:13.7751, lng:100.5437, time:"16:00–18:00",       until:"Apr 18 only",   price:"Free (register)", free:1, desc:"An intimate 2-hour conversation at Format BKK's record shop in Ari, tracing the creative journey of Rasmee Isan Soul — one of Thailand's most distinctive voices. Artist Paeng Rasmee discusses her studio process, the role of vinyl in keeping music physical, and how she works across disciplines. Register in advance as space is very limited.", img:"https://media.timeout.com/images/106394918/750/562/image.jpg" },
+  { id:9,  title:"Planetary Alignment — 3 Planets",        cat:"nature",    e:"🌿", loc:"Eastern sky, visible citywide",      lat:13.7563, lng:100.5018, time:"From 05:00 dawn",   until:"Apr 19–23",     price:"Free",            free:1, desc:"Mars, Mercury, and Saturn are aligning in the pre-dawn eastern sky — a rare triple conjunction visible to the naked eye. No telescope or equipment needed. Just wake up before sunrise, step outside, face east, and look up. The alignment is clearest between 5am and 6am. Best viewed from a rooftop or open park with low light pollution.", img:"https://media.timeout.com/images/106394920/750/562/image.jpg" },
+  { id:10, title:"TK Park Board Game Sessions",            cat:"community", e:"🐾", loc:"Bangkok City Library, Rattanakosin", lat:13.7490, lng:100.4960, time:"11:00–15:00",       until:"Apr 19 only",   price:"Free",            free:1, desc:"TK Park's beloved monthly board game afternoon returns at Bangkok City Library in the historic Rattanakosin area. This session features dice-driven favourites: King of Tokyo (city-smashing monster battles), Sagrada (beautiful stained-glass drafting), and Camel Up (chaotic camel racing bets). All games taught on-site — perfect for solo visitors or small groups wanting to meet locals.", img:"https://media.timeout.com/images/106389296/750/562/image.jpg" },
+  { id:11, title:"Chatuchak — 30,000 Sunflowers",          cat:"nature",    e:"🌿", loc:"Chatuchak Park, Chatuchak",          lat:13.7996, lng:100.5548, time:"04:30–22:00 daily", until:"Ongoing",       price:"Free",            free:1, desc:"More than 30,000 pollen-free sunflowers of the Vincent's Choice Brown Centre variety have bloomed across Chatuchak Park's vast 600,000 sq-m grounds. The display is stunning at golden hour (early morning or late afternoon). Combine it with a visit to the weekend market next door. Completely free, open almost all day — best reached by MRT Chatuchak Park.", img:"https://media.timeout.com/images/106392289/750/562/image.jpg" },
+  { id:12, title:"OFF THE RADAR — We Rise Exhibition",     cat:"art",       e:"🎨", loc:"Bangkok Art & Culture Centre, Siam", lat:13.7469, lng:100.5316, time:"10:00–20:00",       until:"Until May 31",  price:"Free",            free:1, desc:"A powerful group exhibition at BACC spotlighting Thai artists over 40 who have built careers entirely outside institutional backing. The works — painting, sculpture, installation — grapple with precarity, resilience, and the cost of creative independence. Accompanied by a workshop programme running throughout May. Free entry, right next to BTS Siam.", img:"https://media.timeout.com/images/106392292/750/562/image.jpg" },
+  { id:13, title:"Ratchada Train Night Market",            cat:"market",    e:"🛍", loc:"Behind Esplanade Mall, Ratchada",    lat:13.7613, lng:100.5622, time:"17:00–01:00 daily", until:"Ongoing",       price:"Free entry",      free:1, desc:"The famous Ratchada night market is back and buzzing. Browse hundreds of stalls selling affordable fashion (T-shirts from ฿100), sneakers, phone cases, vintage finds, and street food from across Thailand. It's casual, cash-friendly, and great for an evening out. Arrive after 7pm for peak atmosphere. Nearest MRT: Thailand Cultural Centre.", img:"https://media.timeout.com/images/106392295/750/562/image.jpg" },
+  { id:14, title:"Sea Life — Bioluminescent Experience",   cat:"aquarium",  e:"🌊", loc:"Sea Life Bangkok, Siam Paragon",     lat:13.7466, lng:100.5350, time:"10:00–21:00 daily", until:"Until Sep 20",  price:"From ฿449",       free:0, desc:"Sea Life Bangkok has transformed its familiar routes into an ocean-after-dark experience. Bioluminescent jellyfish, deep-sea creatures, and neon-lit interactive walls reimagine the aquarium as something otherworldly. A fantastic activity for kids and adults alike — tickets start at ฿449 and can be booked online for a discount. Located inside Siam Paragon, BTS Siam.", img:"https://media.timeout.com/images/106389283/750/562/image.jpg" },
+  { id:15, title:"Self-Sovereignty Exhibition",            cat:"art",       e:"🎨", loc:"Joyman Gallery, Rattanakosin",       lat:13.7498, lng:100.4978, time:"11:00–18:00",       until:"Until May 3",   price:"Free",            free:1, desc:"Thanwa Huangsmut's debut solo show at Joyman Gallery presents a series of figurative paintings that ask a deceptively simple question: how much space can a person claim for themselves? The figures in her canvases exist in tension — caught mid-gesture, neither fully free nor fully restrained. A quietly striking exhibition in the charming old-town Rattanakosin neighbourhood.", img:"https://media.timeout.com/images/106390470/750/562/image.jpg" },
+  { id:16, title:"In the Midst of Gray",                  cat:"art",       e:"🎨", loc:"Supples Gallery, Charoenkrung",      lat:13.7207, lng:100.5140, time:"11:00–18:00",       until:"Until May 3",   price:"Free",            free:1, desc:"Supples Gallery presents an emotionally layered solo show following a fictional character named Chawky through the fog of uncertainty. The works — a mix of painting and drawing — explore how some feelings linger long after the events that caused them have faded. Charoenkrung is also great for café-hopping and gallery-crawling; pair this with a walk along the riverfront.", img:"https://media.timeout.com/images/106387481/750/562/image.jpg" },
+  { id:17, title:"Concrete Dream — Graffiti Exhibition",   cat:"art",       e:"🎨", loc:"Maison JE Bangkok, Surawong",        lat:13.7255, lng:100.5250, time:"11:00–19:00",       until:"Until May 3",   price:"Free",            free:1, desc:"Seven graffiti artists from around the world treat the walls of Maison JE Bangkok as a shared canvas and common language. The exhibition charts ambition, failure, and stubborn persistence through large-format works spanning wildly different styles — from intricate lettering to abstract murals. One of the most visually arresting shows in Bangkok right now, and completely free.", img:"https://media.timeout.com/images/106384907/750/562/image.jpg" },
+  { id:18, title:"BAC Passport Art Trail",                 cat:"art",       e:"🎨", loc:"27 art spaces across Bangkok",       lat:13.7520, lng:100.4950, time:"Varies by venue",   until:"Until May 31",  price:"Free",            free:1, desc:"Pick up a pocket-sized passport and explore 27 art spaces spread across four curated routes through Bangkok's Old Town and riverbank areas. Collect stamps at each venue and redeem them for exclusive artist-made souvenirs. It's part scavenger hunt, part gallery crawl — a brilliant way to discover hidden spaces in the city. Passports available at BACC and participating venues.", img:"https://media.timeout.com/images/106377574/750/562/image.jpg" }
+];
+
+var COLORS = {
+  "art":"#8b5cf6","music":"#3b82f6","pop-up":"#ef4444","film":"#10b981",
+  "market":"#f59e0b","aquarium":"#06b6d4","nature":"#22c55e",
+  "nightlife":"#a855f7","community":"#f43f5e"
+};
+
+// ── Map Engine ────────────────────────────────────────────────────────────────
+var TILE = 256;
+var zoom = 13;
+var centerLat = 13.748, centerLng = 100.520;
+
+var wrap = document.getElementById('map-wrap');
+var tileLayer = document.getElementById('tile-layer');
+var markerLayer = document.getElementById('marker-layer');
+
+function deg2rad(d) { return d * Math.PI / 180; }
+
+// World pixel coords at current zoom
+function lngToWX(lng) { return ((lng + 180) / 360) * Math.pow(2, zoom) * TILE; }
+function latToWY(lat) {
+  var r = deg2rad(lat);
+  return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, zoom) * TILE;
+}
+
+// Screen pixel from world pixel
+function wx2sx(wx) { return wx - lngToWX(centerLng) + wrap.clientWidth / 2; }
+function wy2sy(wy) { return wy - latToWY(centerLat) + wrap.clientHeight / 2; }
+
+var loadedTiles = {};
+
+function renderTiles() {
+  var cWX = lngToWX(centerLng);
+  var cWY = latToWY(centerLat);
+  var W = wrap.clientWidth, H = wrap.clientHeight;
+
+  var tileTotal = Math.pow(2, zoom);
+  var tileXCenter = cWX / TILE;
+  var tileYCenter = cWY / TILE;
+
+  var tilesX = Math.ceil(W / TILE / 2) + 2;
+  var tilesY = Math.ceil(H / TILE / 2) + 2;
+
+  var needed = {};
+
+  for (var tx = Math.floor(tileXCenter) - tilesX; tx <= Math.ceil(tileXCenter) + tilesX; tx++) {
+    for (var ty = Math.floor(tileYCenter) - tilesY; ty <= Math.ceil(tileYCenter) + tilesY; ty++) {
+      var wtx = ((tx % tileTotal) + tileTotal) % tileTotal;
+      var wty = ty;
+      if (wty < 0 || wty >= tileTotal) continue;
+
+      var key = zoom + '/' + wtx + '/' + wty;
+      needed[key] = { tx: tx, ty: ty, wtx: wtx, wty: wty };
+    }
+  }
+
+  // Position existing tiles, add missing ones
+  Object.keys(needed).forEach(function(key) {
+    var info = needed[key];
+    var px = info.tx * TILE - cWX + W / 2;
+    var py = info.ty * TILE - cWY + H / 2;
+
+    if (loadedTiles[key]) {
+      loadedTiles[key].style.left = px + 'px';
+      loadedTiles[key].style.top  = py + 'px';
+    } else {
+      var img = document.createElement('img');
+      img.style.left = px + 'px';
+      img.style.top  = py + 'px';
+      // Round-robin subdomain a/b/c
+      var sub = ['a','b','c'][(info.wtx + info.wty) % 3];
+      // Esri tiles: no referer requirement, works from file://
+      var sub = ['a','b','c','d'][(info.wtx + info.wty) % 4];
+      img.src = 'https://' + sub + '.basemaps.cartocdn.com/rastertiles/voyager/' + zoom + '/' + info.wtx + '/' + info.wty + '.png';
+      img.onerror = function() { this.style.background = '#1a2035'; };
+      tileLayer.appendChild(img);
+      loadedTiles[key] = img;
+    }
+  });
+
+  // Remove tiles no longer needed
+  Object.keys(loadedTiles).forEach(function(key) {
+    if (!needed[key]) {
+      tileLayer.removeChild(loadedTiles[key]);
+      delete loadedTiles[key];
+    }
+  });
+}
+
+function renderMarkers() {
+  var cWX = lngToWX(centerLng);
+  var cWY = latToWY(centerLat);
+  var W = wrap.clientWidth, H = wrap.clientHeight;
+
+  A.forEach(function(a) {
+    var pin = document.getElementById('pin-' + a.id);
+    if (!pin) return;
+    if (pin.classList.contains('hidden')) { pin.style.display = 'none'; return; }
+    pin.style.display = '';
+
+    var wx = lngToWX(a.lng);
+    var wy = latToWY(a.lat);
+    var sx = wx - cWX + W / 2;
+    var sy = wy - cWY + H / 2;
+    pin.style.left = sx + 'px';
+    pin.style.top  = sy + 'px';
+  });
+}
+
+function render() {
+  renderTiles();
+  renderMarkers();
+}
+
+// ── Create markers ────────────────────────────────────────────────────────────
+A.forEach(function(a) {
+  var pin = document.createElement('div');
+  pin.className = 'mpin';
+  pin.id = 'pin-' + a.id;
+  pin.innerHTML =
+    '<div class="mpin-dot" style="background:' + (COLORS[a.cat]||'#888') + '">' + a.e + '</div>' +
+    '<div class="mpin-label">' + a.title + '</div>';
+  pin.addEventListener('click', function(e) {
+    e.stopPropagation();
+    showPopup(a);
+    highlightCard(a.id);
+  });
+  markerLayer.appendChild(pin);
+});
+
+// ── Popup ─────────────────────────────────────────────────────────────────────
+var popup = document.getElementById('popup');
+var popupImg = document.getElementById('popup-img');
+var popupTitle = document.getElementById('popup-title');
+var popupMeta = document.getElementById('popup-meta');
+
+function showPopup(a) {
+  popupImg.src = a.img;
+  popupTitle.textContent = a.title;
+  popupMeta.innerHTML =
+    '<span>🕐 ' + a.time + '</span>' +
+    '<span>📍 ' + a.loc + '</span>' +
+    '<span class="' + (a.free ? 'green' : 'amber') + '">💰 ' + a.price + '</span>' +
+    '<span style="color:#4b5563">📅 ' + a.until + '</span>';
+
+  // Position near the pin
+  var pin = document.getElementById('pin-' + a.id);
+  var pw = 240, ph = 180;
+  var W = wrap.clientWidth, H = wrap.clientHeight;
+  var px = parseFloat(pin.style.left);
+  var py = parseFloat(pin.style.top);
+
+  var left = px + 22;
+  var top  = py - ph / 2;
+  if (left + pw > W - 10) left = px - pw - 22;
+  if (top < 10) top = 10;
+  if (top + ph > H - 10) top = H - ph - 10;
+
+  popup.style.left = left + 'px';
+  popup.style.top  = top + 'px';
+  popup.style.display = 'block';
+}
+
+document.getElementById('popup-close').addEventListener('click', function() {
+  popup.style.display = 'none';
+});
+wrap.addEventListener('click', function() { popup.style.display = 'none'; });
+
+// ── Pan & drag ────────────────────────────────────────────────────────────────
+var drag = { on: false, startX: 0, startY: 0, dx: 0, dy: 0 };
+var inertiaRaf = null;
+var velSamples = [];  // recent {dx, dy, t} for velocity estimation
+
+// Shift centerLat/Lng by screen pixels (correct directions)
+function shiftCenter(dx, dy) {
+  var scale = 360 / (Math.pow(2, zoom) * TILE);
+  centerLng -= dx * scale;
+  var latRad = deg2rad(centerLat);
+  var merc = Math.log(Math.tan(latRad) + 1 / Math.cos(latRad));
+  // +dy because screen Y and map Y are both positive-downward here
+  var newMerc = merc + (dy / (Math.pow(2, zoom) * TILE)) * 2 * Math.PI;
+  centerLat = Math.atan(Math.sinh(newMerc)) * 180 / Math.PI;
+}
+
+wrap.addEventListener('mousedown', function(e) {
+  if (e.target.closest('.mpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
+  if (inertiaRaf) { cancelAnimationFrame(inertiaRaf); inertiaRaf = null; }
+  drag.on = true;
+  drag.startX = e.clientX;
+  drag.startY = e.clientY;
+  drag.dx = 0; drag.dy = 0;
+  velSamples = [];
+  wrap.classList.add('dragging');
+  e.preventDefault();
+});
+
+window.addEventListener('mousemove', function(e) {
+  if (!drag.on) return;
+  drag.dx = e.clientX - drag.startX;
+  drag.dy = e.clientY - drag.startY;
+  tileLayer.style.transform   = 'translate(' + drag.dx + 'px,' + drag.dy + 'px)';
+  markerLayer.style.transform = 'translate(' + drag.dx + 'px,' + drag.dy + 'px)';
+  var now = Date.now();
+  velSamples.push({ dx: drag.dx, dy: drag.dy, t: now });
+  velSamples = velSamples.filter(function(s) { return now - s.t < 80; });
+});
+
+window.addEventListener('mouseup', function() {
+  if (!drag.on) return;
+  drag.on = false;
+  wrap.classList.remove('dragging');
+  tileLayer.style.transform   = '';
+  markerLayer.style.transform = '';
+
+  // Commit the drag offset
+  shiftCenter(drag.dx, drag.dy);
+  render();
+
+  // Compute release velocity (px/frame at 60fps)
+  var vx = 0, vy = 0;
+  if (velSamples.length >= 2) {
+    var a = velSamples[0], b = velSamples[velSamples.length - 1];
+    var dt = Math.max(b.t - a.t, 1);
+    vx = (b.dx - a.dx) / dt * 16;
+    vy = (b.dy - a.dy) / dt * 16;
+  }
+
+  // Inertia — glide to a stop like Google Maps
+  if (Math.abs(vx) > 0.8 || Math.abs(vy) > 0.8) {
+    (function glide() {
+      vx *= 0.88;
+      vy *= 0.88;
+      if (Math.abs(vx) < 0.4 && Math.abs(vy) < 0.4) return;
+      shiftCenter(vx, vy);
+      render();
+      inertiaRaf = requestAnimationFrame(glide);
+    })();
+  }
+});
+
+// ── Zoom ─────────────────────────────────────────────────────────────────────
+function changeZoom(delta) {
+  var newZoom = Math.min(17, Math.max(10, zoom + delta));
+  if (newZoom === zoom) return;
+  zoom = newZoom;
+  loadedTiles = {};
+  tileLayer.innerHTML = '';
+  render();
+}
+
+document.getElementById('btn-in').addEventListener('click', function() { changeZoom(1); });
+document.getElementById('btn-out').addEventListener('click', function() { changeZoom(-1); });
+
+wrap.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  changeZoom(e.deltaY < 0 ? 1 : -1);
+}, { passive: false });
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+var sidebar = document.getElementById('sidebar');
+
+A.forEach(function(a) {
+  var el = document.createElement('div');
+  el.className = 'card';
+  el.id = 'card-' + a.id;
+  el.dataset.cat = a.cat;
+  el.innerHTML =
+    '<img class="card-img" src="' + a.img + '" alt="" onerror="this.style.display=\'none\'">' +
+    '<div class="card-body">' +
+      '<span class="ctag tag-' + a.cat + '">' + a.e + ' ' + a.cat + '</span>' +
+      '<div class="card-title">' + a.title + '</div>' +
+      '<div class="card-meta">' +
+        '<span>🕐 ' + a.time + '</span>' +
+        '<span>📍 ' + a.loc + '</span>' +
+        '<span class="' + (a.free ? 'green' : 'amber') + '">💰 ' + a.price + '</span>' +
+        '<span style="color:#4b5563">📅 ' + a.until + '</span>' +
+      '</div>' +
+      '<div class="card-desc">' + a.desc + '</div>' +
+    '</div>';
+  el.addEventListener('click', function() { flyTo(a); });
+  sidebar.appendChild(el);
+});
+
+function highlightCard(id) {
+  document.querySelectorAll('.card').forEach(function(c) { c.classList.remove('active'); });
+  var c = document.getElementById('card-' + id);
+  if (c) { c.classList.add('active'); c.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+}
+
+function flyTo(a) {
+  centerLat = a.lat;
+  centerLng = a.lng;
+  zoom = 15;
+  loadedTiles = {};
+  tileLayer.innerHTML = '';
+  render();
+  setTimeout(function() { showPopup(a); }, 80);
+  highlightCard(a.id);
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('.pill').forEach(function(pill) {
+  pill.addEventListener('click', function() {
+    document.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('on'); });
+    pill.classList.add('on');
+    var f = pill.dataset.f;
+    A.forEach(function(a) {
+      var show = f === 'all' || a.cat === f;
+      var card = document.getElementById('card-' + a.id);
+      var pin = document.getElementById('pin-' + a.id);
+      if (card) card.classList.toggle('hide', !show);
+      if (pin) pin.classList.toggle('hidden', !show);
+    });
+    popup.style.display = 'none';
+
+    if (f !== 'all') {
+      var vis = A.filter(function(a) { return a.cat === f; });
+      if (vis.length) {
+        var lats = vis.map(function(a) { return a.lat; });
+        var lngs = vis.map(function(a) { return a.lng; });
+        centerLat = (Math.min.apply(null,lats) + Math.max.apply(null,lats)) / 2;
+        centerLng = (Math.min.apply(null,lngs) + Math.max.apply(null,lngs)) / 2;
+        zoom = 13;
+        loadedTiles = {};
+        tileLayer.innerHTML = '';
+      }
+    } else {
+      centerLat = 13.748; centerLng = 100.520; zoom = 13;
+      loadedTiles = {};
+      tileLayer.innerHTML = '';
+    }
+    render();
+  });
+});
+
+// ── Initial render ────────────────────────────────────────────────────────────
+window.addEventListener('load', function() {
+  render();
+});
+window.addEventListener('resize', function() {
+  render();
+});
+</script>
+</body>
+</html>

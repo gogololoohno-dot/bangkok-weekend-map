@@ -284,8 +284,9 @@ function renderTiles() {
       img.style.top  = py + 'px';
       // Round-robin subdomain a/b/c
       var sub = ['a','b','c'][(info.wtx + info.wty) % 3];
-      // Wikimedia tiles — English labels, no referer requirement
-      img.src = 'https://maps.wikimedia.org/osm-intl/' + zoom + '/' + info.wtx + '/' + info.wty + '.png';
+      // CartoDB Voyager — English labels, Google Maps-like colours, reliable
+      var sub = ['a','b','c','d'][(info.wtx + info.wty) % 4];
+      img.src = 'https://' + sub + '.basemaps.cartocdn.com/rastertiles/voyager/' + zoom + '/' + info.wtx + '/' + info.wty + '.png';
       img.onerror = function() { this.style.background = '#1a2035'; };
       tileLayer.appendChild(img);
       loadedTiles[key] = img;

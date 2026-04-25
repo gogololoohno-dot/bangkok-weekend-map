@@ -14,14 +14,16 @@ header {
   padding:11px 18px; display:flex; align-items:center; gap:10px; flex-shrink:0;
 }
 .htitle { font-size:1rem; font-weight:700; }
-.hsub { font-size:0.7rem; color:#9ca3af; }
+.hsub { font-size:0.7rem; color:#cbd5e1; }
 .badge { margin-left:auto; background:#f97316; color:#fff; font-size:0.65rem; font-weight:700; padding:3px 10px; border-radius:20px; }
 
 .filters {
   background:#1f2937; border-bottom:1px solid #374151;
-  padding:7px 14px; display:flex; gap:5px; flex-wrap:wrap; align-items:center; flex-shrink:0;
+  padding:7px 14px; display:flex; gap:5px; flex-wrap:nowrap; align-items:center; flex-shrink:0;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
 }
-.filters label { font-size:0.65rem; color:#6b7280; }
+.filters::-webkit-scrollbar { display:none; }
+.filters label { font-size:0.65rem; color:#e2e8f0; flex-shrink:0; }
 .pill {
   font-size:0.62rem; font-weight:600; padding:3px 9px; border-radius:20px;
   border:1px solid #374151; background:#111827; color:#d1d5db; cursor:pointer; transition:all 0.15s;
@@ -49,6 +51,41 @@ aside {
 aside::-webkit-scrollbar { width:3px; }
 aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
 
+/* ── Mobile ── */
+@media (max-width:640px) {
+  header { padding:10px 14px; }
+  .htitle { font-size:0.9rem; }
+  .hsub { display:none; }
+
+  .layout { flex-direction:column-reverse; }
+
+  aside {
+    width:100%; min-width:0;
+    height:42vh; border-right:none; border-top:1px solid #1e293b;
+  }
+
+  .card-img { height:90px; }
+  .card-desc { display:none; } /* hide long desc on mobile cards */
+
+  #map-wrap { height:58vh; }
+
+  /* Marker labels hidden on mobile — too cluttered */
+  .mpin-label { display:none; }
+  /* Bigger tap targets */
+  .mpin-dot { width:40px; height:40px; font-size:18px; }
+
+  /* Popup anchors to bottom of map */
+  #popup {
+    position:fixed !important;
+    bottom:44vh !important; top:auto !important;
+    left:10px !important; right:10px !important;
+    width:auto !important;
+    border-radius:14px;
+  }
+
+  .zbtn { width:38px; height:38px; font-size:1.3rem; }
+}
+
 .card { border-bottom:1px solid #1e293b; cursor:pointer; transition:background 0.12s; }
 .card:hover { background:#1e293b; }
 .card.active { background:#1e293b; border-left:3px solid #f97316; }
@@ -70,11 +107,11 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
 .tag-community { background:#881337; color:#fda4af; }
 
 .card-title { font-size:0.8rem; font-weight:700; color:#f9fafb; margin-bottom:4px; line-height:1.3; }
-.card-meta { font-size:0.68rem; color:#94a3b8; display:flex; flex-direction:column; gap:3px; }
+.card-meta { font-size:0.68rem; color:#e2e8f0; display:flex; flex-direction:column; gap:3px; }
 .card-meta span { display:flex; align-items:flex-start; gap:4px; }
-.green { color:#4ade80; font-weight:600; }
-.amber { color:#fbbf24; font-weight:600; }
-.card-desc { font-size:0.72rem; color:#cbd5e1; margin-top:6px; line-height:1.6; }
+.green { color:#4ade80; font-weight:700; }
+.amber { color:#fcd34d; font-weight:700; }
+.card-desc { font-size:0.72rem; color:#f1f5f9; margin-top:6px; line-height:1.6; }
 
 /* Map */
 #map-wrap { flex:1; position:relative; min-width:0; min-height:0; overflow:hidden; background:#1a2035; cursor:grab; }
@@ -405,41 +442,32 @@ function shiftCenter(dx, dy) {
   centerLat = Math.atan(Math.sinh(newMerc)) * 180 / Math.PI;
 }
 
-wrap.addEventListener('mousedown', function(e) {
-  if (e.target.closest('.mpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
+function startDrag(x, y) {
   if (inertiaRaf) { cancelAnimationFrame(inertiaRaf); inertiaRaf = null; }
   drag.on = true;
-  drag.startX = e.clientX;
-  drag.startY = e.clientY;
+  drag.startX = x; drag.startY = y;
   drag.dx = 0; drag.dy = 0;
   velSamples = [];
   wrap.classList.add('dragging');
-  e.preventDefault();
-});
-
-window.addEventListener('mousemove', function(e) {
+}
+function moveDrag(x, y) {
   if (!drag.on) return;
-  drag.dx = e.clientX - drag.startX;
-  drag.dy = e.clientY - drag.startY;
-  tileLayer.style.transform   = 'translate(' + drag.dx + 'px,' + drag.dy + 'px)';
-  markerLayer.style.transform = 'translate(' + drag.dx + 'px,' + drag.dy + 'px)';
+  drag.dx = x - drag.startX;
+  drag.dy = y - drag.startY;
+  var t = 'translate(' + drag.dx + 'px,' + drag.dy + 'px)';
+  tileLayer.style.transform = markerLayer.style.transform = t;
   var now = Date.now();
   velSamples.push({ dx: drag.dx, dy: drag.dy, t: now });
   velSamples = velSamples.filter(function(s) { return now - s.t < 80; });
-});
-
-window.addEventListener('mouseup', function() {
+}
+function endDrag() {
   if (!drag.on) return;
   drag.on = false;
   wrap.classList.remove('dragging');
-  tileLayer.style.transform   = '';
-  markerLayer.style.transform = '';
-
-  // Commit the drag offset
+  tileLayer.style.transform = markerLayer.style.transform = '';
   shiftCenter(drag.dx, drag.dy);
   render();
 
-  // Compute release velocity (px/frame at 60fps)
   var vx = 0, vy = 0;
   if (velSamples.length >= 2) {
     var a = velSamples[0], b = velSamples[velSamples.length - 1];
@@ -447,19 +475,37 @@ window.addEventListener('mouseup', function() {
     vx = (b.dx - a.dx) / dt * 16;
     vy = (b.dy - a.dy) / dt * 16;
   }
-
-  // Inertia — glide to a stop like Google Maps
   if (Math.abs(vx) > 0.8 || Math.abs(vy) > 0.8) {
     (function glide() {
-      vx *= 0.88;
-      vy *= 0.88;
+      vx *= 0.88; vy *= 0.88;
       if (Math.abs(vx) < 0.4 && Math.abs(vy) < 0.4) return;
-      shiftCenter(vx, vy);
-      render();
+      shiftCenter(vx, vy); render();
       inertiaRaf = requestAnimationFrame(glide);
     })();
   }
+}
+
+// Mouse
+wrap.addEventListener('mousedown', function(e) {
+  if (e.target.closest('.mpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
+  startDrag(e.clientX, e.clientY);
+  e.preventDefault();
 });
+window.addEventListener('mousemove', function(e) { moveDrag(e.clientX, e.clientY); });
+window.addEventListener('mouseup', endDrag);
+
+// Touch
+wrap.addEventListener('touchstart', function(e) {
+  if (e.target.closest('.mpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
+  if (e.touches.length !== 1) return;
+  startDrag(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: true });
+wrap.addEventListener('touchmove', function(e) {
+  if (e.touches.length !== 1) return;
+  moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+  e.preventDefault();
+}, { passive: false });
+wrap.addEventListener('touchend', endDrag);
 
 // ── Zoom ─────────────────────────────────────────────────────────────────────
 function changeZoom(delta) {

@@ -7,8 +7,8 @@ Scheduled to run every Friday via Windows Task Scheduler.
 import re
 import json
 import sys
+import os
 import requests
-import anthropic
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -35,7 +35,9 @@ def fetch_page(url: str) -> str:
 
 
 def extract_activities(html: str) -> list[dict]:
-    client = anthropic.Anthropic()
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY environment variable not set.")
     print("Asking Claude to parse activities...")
 
     prompt = f"""You are parsing a Timeout Bangkok weekend activities article.
@@ -64,12 +66,23 @@ HTML content (truncated to first 80 000 chars):
 {html[:80000]}
 """
 
-    msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=6000,
-        messages=[{"role": "user", "content": prompt}]
+    # Raw HTTP call — no SDK, no pydantic, no DLL issues
+    resp = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        json={
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 6000,
+            "messages": [{"role": "user", "content": prompt}],
+        },
+        timeout=60,
     )
-    raw = msg.content[0].text.strip()
+    resp.raise_for_status()
+    raw = resp.json()["content"][0]["text"].strip()
 
     # Strip markdown code fences if Claude wrapped the JSON
     raw = re.sub(r"^```[a-z]*\n?", "", raw)
@@ -92,11 +105,11 @@ HTML content (truncated to first 80 000 chars):
 
 def weekend_label() -> str:
     today = datetime.now()
-    # Next Friday (or today if Friday)
-    days_ahead = (4 - today.weekday()) % 7
-    friday = today + timedelta(days=days_ahead)
-    sunday = friday + timedelta(days=2)
-    return f"{friday.strftime('%b %-d')}–{sunday.strftime('%-d, %Y')}"
+    # Find the coming Saturday (weekday=5); if today is Saturday get next one
+    days_ahead = (5 - today.weekday()) % 7 or 7
+    saturday = today + timedelta(days=days_ahead)
+    sunday = saturday + timedelta(days=1)
+    return f"{saturday.strftime('%b')} {saturday.day}–{sunday.day}, {sunday.year}"
 
 
 def update_html(activities: list[dict]) -> str:

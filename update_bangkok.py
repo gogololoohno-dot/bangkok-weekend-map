@@ -99,7 +99,7 @@ def weekend_label() -> str:
     return f"{friday.strftime('%b %-d')}–{sunday.strftime('%-d, %Y')}"
 
 
-def update_html(activities: list[dict]) -> None:
+def update_html(activities: list[dict]) -> str:
     html = HTML_FILE.read_text(encoding="utf-8")
 
     # Replace ACTIVITIES array
@@ -111,8 +111,8 @@ def update_html(activities: list[dict]) -> None:
     # Replace weekend date label in the subtitle
     label = weekend_label()
     html = re.sub(
-        r"(18 picks from Timeout Bangkok · ).*",
-        rf"\g<1>{len(activities)} picks · Timeout Bangkok · {label}",
+        r"(\d+ picks · Timeout Bangkok · ).*",
+        rf"{len(activities)} picks · Timeout Bangkok · {label}",
         html
     )
 
@@ -121,13 +121,31 @@ def update_html(activities: list[dict]) -> None:
 
     HTML_FILE.write_text(html, encoding="utf-8")
     print(f"  → {HTML_FILE} updated ({len(activities)} activities, dates: {label})")
+    return label
+
+
+def git_push(label: str) -> None:
+    import subprocess
+    repo = HTML_FILE.parent
+    cmds = [
+        ["git", "add", "index.html"],
+        ["git", "commit", "-m", f"Auto-update: Bangkok weekend picks {label}"],
+        ["git", "push"],
+    ]
+    for cmd in cmds:
+        result = subprocess.run(cmd, cwd=repo, capture_output=True, text=True)
+        print(result.stdout.strip() or result.stderr.strip())
+        if result.returncode != 0:
+            raise RuntimeError(f"Git command failed: {' '.join(cmd)}\n{result.stderr}")
+    print("  → Pushed to GitHub → Vercel will redeploy automatically")
 
 
 def main():
     try:
         html = fetch_page(TIMEOUT_URL)
         activities = extract_activities(html)
-        update_html(activities)
+        label = update_html(activities)
+        git_push(label)
         print("Done ✓")
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)

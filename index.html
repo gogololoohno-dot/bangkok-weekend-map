@@ -650,28 +650,27 @@ var BAC_ACTIVE = new Date() <= new Date('2026-05-31T23:59:59+07:00');
 var bacVisible = false;
 
 var BAC = BAC_ACTIVE ? [
-  // Coordinates are based on known Bangkok venues; some are approximate.
-  // 20 of 27 confirmed locations retrieved from the official Google Maps list.
-  {id:'b1',  title:'Ratchadamnoen Contemporary Art Center', loc:'Ratchadamnoen Klang, Old City',       lat:13.7598, lng:100.5010, time:'Tue–Sun 10:00–19:00', zone:'Heritage Quarter'},
-  {id:'b2',  title:'Chulalongkorn University Museum',       loc:'Chulalongkorn University, Pathumwan', lat:13.7356, lng:100.5295, time:'Mon–Fri 9:00–16:30',  zone:'Urban Quarter'},
-  {id:'b3',  title:'Theatre Residence',                     loc:'Charoennakhon Rd, Khlong San',        lat:13.7223, lng:100.5108, time:'Daily 11:00–22:00',   zone:'Downstream'},
-  {id:'b4',  title:'ASVIN',                                 loc:'Charoen Nakhon, Khlong San',          lat:13.7262, lng:100.5078, time:'Wed–Sun 11:00–18:00', zone:'Downstream'},
-  {id:'b5',  title:'MOWA Bangkok',                          loc:'Charoen Nakhon, Khlong San',          lat:13.7249, lng:100.5065, time:'Daily 7:00–22:00',    zone:'Downstream'},
-  {id:'b6',  title:'River City Bangkok',                    loc:'Si Phraya Rd, Bang Rak',              lat:13.7323, lng:100.5117, time:'Daily 10:00–20:00',   zone:'Upstream'},
-  {id:'b7',  title:'Princess Galyani Vadhana Institute of Music', loc:'Khlong San, Thonburi',         lat:13.7192, lng:100.5139, time:'Mon–Fri 9:00–18:00',  zone:'Upstream'},
-  {id:'b8',  title:'Numthong Art Space',                    loc:'Charoen Nakhon, Khlong San',          lat:13.7258, lng:100.5080, time:'Tue–Sat 11:00–18:00', zone:'Downstream'},
-  {id:'b9',  title:'Bangkok Art & Culture Centre',          loc:'Siam, Pathumwan',                     lat:13.7480, lng:100.5296, time:'Tue–Sun 10:00–19:00', zone:'Urban Quarter'},
-  {id:'b10', title:'MATDOT Art Center',                     loc:'Charoen Nakhon area',                 lat:13.7284, lng:100.5100, time:'Daily 10:00–18:00',   zone:'Downstream'},
-  {id:'b11', title:'Bangkok City Library',                  loc:'Rattanakosin, Old City',              lat:13.7558, lng:100.5028, time:'Tue–Sat 9:00–21:00', zone:'Heritage Quarter'},
-  {id:'b12', title:'m Galleria',                            loc:'River City Bangkok, 3F',              lat:13.7326, lng:100.5120, time:'Daily 10:00–19:00',   zone:'Upstream'},
-  {id:'b13', title:'6060 Arts Space',                       loc:'Charoenkrung, Bang Rak',              lat:13.7302, lng:100.5124, time:'Mon–Sat 12:00–20:00', zone:'Upstream'},
-  {id:'b14', title:'Museum Pier',                           loc:'Na Phra That, Rattanakosin',          lat:13.7572, lng:100.4921, time:'Daily 9:00–17:00',    zone:'Heritage Quarter'},
-  {id:'b15', title:'Warin Lab Contemporary',                loc:'Silom, Bang Rak',                     lat:13.7268, lng:100.5244, time:'Tue–Sat 10:30–19:30', zone:'Urban Quarter'},
-  {id:'b16', title:'Joyman Gallery',                        loc:'Rattanakosin, Old City',              lat:13.7498, lng:100.4978, time:'Tue–Sun 11:00–18:00', zone:'Heritage Quarter'},
-  {id:'b17', title:'KYLA Gallery & Wine Bar',               loc:'Silom, Bang Rak',                     lat:13.7265, lng:100.5248, time:'Tue–Sun 18:00–00:00', zone:'Urban Quarter'},
-  {id:'b18', title:'Rimkhobfa Bookstore',                   loc:'Bangkok',                             lat:13.7476, lng:100.5299, time:'Daily 9:00–18:00',    zone:'Urban Quarter'},
-  {id:'b19', title:'West Eden Contemporary Art',            loc:'Charoen Nakhon area',                 lat:13.7244, lng:100.5072, time:'Thu–Sun 11:00–18:00', zone:'Downstream'},
-  {id:'b20', title:'Cinema Oasis',                          loc:'Bangkok',                             lat:13.7291, lng:100.5103, time:'Thu–Sun 12:00–18:00', zone:'Downstream'},
+  // GPS coordinates verified via Google Maps (Apr 2026). 20 of 27 venues.
+  {id:'b1',  title:'Ratchadamnoen Contemporary Art Center', loc:'Ratchadamnoen Klang, Old City',       lat:13.7560, lng:100.5030, time:'Tue–Sun 10:00–19:00', zone:'Heritage Quarter'},
+  {id:'b2',  title:'Chulalongkorn University Museum',       loc:'Chulalongkorn University, Pathumwan', lat:13.7395, lng:100.5323, time:'Mon–Fri 9:00–16:30',  zone:'Urban Quarter'},
+  {id:'b3',  title:'Theatre Residence',                     loc:'Wang Lang, Siriraj, Thonburi',        lat:13.7537, lng:100.4861, time:'Daily 11:00–22:00',   zone:'Upstream'},
+  {id:'b4',  title:'ASVIN',                                 loc:'Maharat Rd, Rattanakosin',            lat:13.7513, lng:100.5141, time:'Wed–Sun 11:00–18:00', zone:'Heritage Quarter'},
+  {id:'b5',  title:'MOWA Bangkok',                          loc:'Wang Lang, Siriraj, Thonburi',        lat:13.7553, lng:100.4866, time:'Daily 7:00–22:00',    zone:'Upstream'},
+  {id:'b6',  title:'River City Bangkok',                    loc:'Si Phraya Rd, Bang Rak',              lat:13.7302, lng:100.5133, time:'Daily 10:00–20:00',   zone:'Upstream'},
+  {id:'b7',  title:'Princess Galyani Vadhana Institute of Music', loc:'Arun Amarin Rd, Siriraj',      lat:13.7682, lng:100.4939, time:'Mon–Fri 9:00–18:00',  zone:'Upstream'},
+  {id:'b8',  title:'Numthong Art Space',                    loc:'Phahonyothin, Ari, North Bangkok',    lat:13.7842, lng:100.5424, time:'Tue–Sat 11:00–18:00', zone:'North'},
+  {id:'b9',  title:'Bangkok Art & Culture Centre',          loc:'Siam, Pathumwan',                     lat:13.7467, lng:100.5302, time:'Tue–Sun 10:00–19:00', zone:'Urban Quarter'},
+  {id:'b10', title:'MATDOT Art Center',                     loc:'Lan Luang Rd, Old City',              lat:13.7565, lng:100.5079, time:'Daily 10:00–18:00',   zone:'Heritage Quarter'},
+  {id:'b11', title:'Bangkok City Library',                  loc:'Rattanakosin, Old City',              lat:13.7576, lng:100.4989, time:'Tue–Sat 9:00–21:00', zone:'Heritage Quarter'},
+  {id:'b12', title:'m Galleria',                            loc:'River City Bangkok, 3F',              lat:13.7303, lng:100.5129, time:'Daily 10:00–19:00',   zone:'Upstream'},
+  {id:'b13', title:'6060 Arts Space',                       loc:'Pradipat Rd, Phaya Thai',             lat:13.7908, lng:100.5466, time:'Mon–Sat 12:00–20:00', zone:'North'},
+  {id:'b14', title:'Museum Pier',                           loc:'Na Phra That Rd, Rattanakosin',       lat:13.7527, lng:100.4891, time:'Daily 9:00–17:00',    zone:'Heritage Quarter'},
+  {id:'b15', title:'Warin Lab Contemporary',                loc:'OP Garden, Charoen Krung, Bang Rak',  lat:13.7252, lng:100.5159, time:'Tue–Sat 10:30–19:30', zone:'Upstream'},
+  {id:'b16', title:'Joyman Gallery',                        loc:'Sriphraya Rd, Bang Rak',              lat:13.7519, lng:100.5046, time:'Tue–Sun 11:00–18:00', zone:'Heritage Quarter'},
+  {id:'b17', title:'KYLA Gallery & Wine Bar',               loc:'Silom Soi 23, Sun Square, Silom',     lat:13.7219, lng:100.5184, time:'Tue–Sun 18:00–00:00', zone:'Urban Quarter'},
+  {id:'b18', title:'Rimkhobfa Bookstore',                   loc:'Charan Santwong Rd, Thonburi',        lat:13.7863, lng:100.4970, time:'Daily 9:00–18:00',    zone:'Upstream'},
+  {id:'b19', title:'West Eden Contemporary Art',            loc:'Sukhumvit Soi 31, Watthana',          lat:13.7388, lng:100.5663, time:'Thu–Sun 11:00–18:00', zone:'East'},
+  {id:'b20', title:'Cinema Oasis',                          loc:'Sukhumvit Soi 43, Watthana',          lat:13.7290, lng:100.5730, time:'Thu–Sun 12:00–18:00', zone:'East'},
 ] : [];
 
 // Create BAC map pins (render into same markerLayer)

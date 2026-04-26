@@ -176,6 +176,37 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
   font-size:0.55rem; color:#6b7280; background:rgba(15,23,42,0.8); padding:2px 5px; border-radius:3px;
 }
 #attr a { color:#6b7280; }
+
+/* BAC Passport Art Trail */
+.pill[data-f="bac"].on { background:#e11d48; border-color:#e11d48; }
+.bpin {
+  position:absolute; pointer-events:all; cursor:pointer;
+  display:flex; align-items:center; gap:5px;
+  transform:translate(-50%,-50%);
+  transition:transform 0.15s;
+  z-index:8; white-space:nowrap;
+}
+.bpin:hover { transform:translate(-50%,-50%) scale(1.1); z-index:18; }
+.bpin.bpin-hidden { display:none; }
+.bpin-dot {
+  width:28px; height:28px; border-radius:5px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; border:2px solid rgba(255,255,255,0.9);
+  background:#e11d48;
+  box-shadow:0 2px 8px rgba(0,0,0,0.55);
+}
+.bpin-label {
+  background:rgba(225,29,72,0.88); color:#fff;
+  font-size:0.56rem; font-weight:700;
+  padding:2px 6px; border-radius:5px;
+  box-shadow:0 1px 4px rgba(0,0,0,0.5);
+  pointer-events:none;
+  max-width:130px; white-space:normal; line-height:1.3;
+}
+@media (max-width:640px) {
+  .bpin-label { display:none; }
+  .bpin-dot { width:36px; height:36px; font-size:16px; }
+}
 </style>
 </head>
 <body>
@@ -201,6 +232,7 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
   <span class="pill" data-f="nature">🌿 Nature</span>
   <span class="pill" data-f="nightlife">🌙 Nightlife</span>
   <span class="pill" data-f="community">🐾 Community</span>
+  <span class="pill" data-f="bac" style="border-color:#e11d48; color:#fda4af;">🗺 BAC Trail</span>
 </div>
 
 <div class="layout">
@@ -395,6 +427,7 @@ var popupTitle = document.getElementById('popup-title');
 var popupMeta = document.getElementById('popup-meta');
 
 function showPopup(a) {
+  popupImg.style.display = '';
   popupImg.src = a.img;
   popupTitle.textContent = a.title;
   popupMeta.innerHTML =
@@ -487,7 +520,7 @@ function endDrag() {
 
 // Mouse
 wrap.addEventListener('mousedown', function(e) {
-  if (e.target.closest('.mpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
+  if (e.target.closest('.mpin') || e.target.closest('.bpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
   startDrag(e.clientX, e.clientY);
   e.preventDefault();
 });
@@ -496,7 +529,7 @@ window.addEventListener('mouseup', endDrag);
 
 // Touch
 wrap.addEventListener('touchstart', function(e) {
-  if (e.target.closest('.mpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
+  if (e.target.closest('.mpin') || e.target.closest('.bpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
   if (e.touches.length !== 1) return;
   startDrag(e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: true });
@@ -570,9 +603,10 @@ function flyTo(a) {
 // ── Filters ───────────────────────────────────────────────────────────────────
 document.querySelectorAll('.pill').forEach(function(pill) {
   pill.addEventListener('click', function() {
-    document.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('on'); });
-    pill.classList.add('on');
     var f = pill.dataset.f;
+    if (f === 'bac') return; // handled separately below
+    document.querySelectorAll('.pill:not([data-f="bac"])').forEach(function(p) { p.classList.remove('on'); });
+    pill.classList.add('on');
     A.forEach(function(a) {
       var show = f === 'all' || a.cat === f;
       var card = document.getElementById('card-' + a.id);
@@ -609,6 +643,128 @@ window.addEventListener('load', function() {
 window.addEventListener('resize', function() {
   render();
 });
+
+// ── BAC Passport Art Trail ────────────────────────────────────────────────────
+// Active until 31 May 2026; auto-hides after that date.
+var BAC_ACTIVE = new Date() <= new Date('2026-05-31T23:59:59+07:00');
+var bacVisible = false;
+
+var BAC = BAC_ACTIVE ? [
+  // Coordinates are based on known Bangkok venues; some are approximate.
+  // 20 of 27 confirmed locations retrieved from the official Google Maps list.
+  {id:'b1',  title:'Ratchadamnoen Contemporary Art Center', loc:'Ratchadamnoen Klang, Old City',       lat:13.7598, lng:100.5010, time:'Tue–Sun 10:00–19:00', zone:'Heritage Quarter'},
+  {id:'b2',  title:'Chulalongkorn University Museum',       loc:'Chulalongkorn University, Pathumwan', lat:13.7356, lng:100.5295, time:'Mon–Fri 9:00–16:30',  zone:'Urban Quarter'},
+  {id:'b3',  title:'Theatre Residence',                     loc:'Charoennakhon Rd, Khlong San',        lat:13.7223, lng:100.5108, time:'Daily 11:00–22:00',   zone:'Downstream'},
+  {id:'b4',  title:'ASVIN',                                 loc:'Charoen Nakhon, Khlong San',          lat:13.7262, lng:100.5078, time:'Wed–Sun 11:00–18:00', zone:'Downstream'},
+  {id:'b5',  title:'MOWA Bangkok',                          loc:'Charoen Nakhon, Khlong San',          lat:13.7249, lng:100.5065, time:'Daily 7:00–22:00',    zone:'Downstream'},
+  {id:'b6',  title:'River City Bangkok',                    loc:'Si Phraya Rd, Bang Rak',              lat:13.7323, lng:100.5117, time:'Daily 10:00–20:00',   zone:'Upstream'},
+  {id:'b7',  title:'Princess Galyani Vadhana Institute of Music', loc:'Khlong San, Thonburi',         lat:13.7192, lng:100.5139, time:'Mon–Fri 9:00–18:00',  zone:'Upstream'},
+  {id:'b8',  title:'Numthong Art Space',                    loc:'Charoen Nakhon, Khlong San',          lat:13.7258, lng:100.5080, time:'Tue–Sat 11:00–18:00', zone:'Downstream'},
+  {id:'b9',  title:'Bangkok Art & Culture Centre',          loc:'Siam, Pathumwan',                     lat:13.7480, lng:100.5296, time:'Tue–Sun 10:00–19:00', zone:'Urban Quarter'},
+  {id:'b10', title:'MATDOT Art Center',                     loc:'Charoen Nakhon area',                 lat:13.7284, lng:100.5100, time:'Daily 10:00–18:00',   zone:'Downstream'},
+  {id:'b11', title:'Bangkok City Library',                  loc:'Rattanakosin, Old City',              lat:13.7558, lng:100.5028, time:'Tue–Sat 9:00–21:00', zone:'Heritage Quarter'},
+  {id:'b12', title:'m Galleria',                            loc:'River City Bangkok, 3F',              lat:13.7326, lng:100.5120, time:'Daily 10:00–19:00',   zone:'Upstream'},
+  {id:'b13', title:'6060 Arts Space',                       loc:'Charoenkrung, Bang Rak',              lat:13.7302, lng:100.5124, time:'Mon–Sat 12:00–20:00', zone:'Upstream'},
+  {id:'b14', title:'Museum Pier',                           loc:'Na Phra That, Rattanakosin',          lat:13.7572, lng:100.4921, time:'Daily 9:00–17:00',    zone:'Heritage Quarter'},
+  {id:'b15', title:'Warin Lab Contemporary',                loc:'Silom, Bang Rak',                     lat:13.7268, lng:100.5244, time:'Tue–Sat 10:30–19:30', zone:'Urban Quarter'},
+  {id:'b16', title:'Joyman Gallery',                        loc:'Rattanakosin, Old City',              lat:13.7498, lng:100.4978, time:'Tue–Sun 11:00–18:00', zone:'Heritage Quarter'},
+  {id:'b17', title:'KYLA Gallery & Wine Bar',               loc:'Silom, Bang Rak',                     lat:13.7265, lng:100.5248, time:'Tue–Sun 18:00–00:00', zone:'Urban Quarter'},
+  {id:'b18', title:'Rimkhobfa Bookstore',                   loc:'Bangkok',                             lat:13.7476, lng:100.5299, time:'Daily 9:00–18:00',    zone:'Urban Quarter'},
+  {id:'b19', title:'West Eden Contemporary Art',            loc:'Charoen Nakhon area',                 lat:13.7244, lng:100.5072, time:'Thu–Sun 11:00–18:00', zone:'Downstream'},
+  {id:'b20', title:'Cinema Oasis',                          loc:'Bangkok',                             lat:13.7291, lng:100.5103, time:'Thu–Sun 12:00–18:00', zone:'Downstream'},
+] : [];
+
+// Create BAC map pins (render into same markerLayer)
+BAC.forEach(function(b) {
+  var pin = document.createElement('div');
+  pin.className = 'bpin bpin-hidden';
+  pin.id = 'bpin-' + b.id;
+  pin.innerHTML =
+    '<div class="bpin-dot">🎨</div>' +
+    '<div class="bpin-label">' + b.title + '</div>';
+  pin.addEventListener('click', function(e) {
+    e.stopPropagation();
+    showBACPopup(b);
+  });
+  markerLayer.appendChild(pin);
+});
+
+function renderBACMarkers() {
+  if (!BAC_ACTIVE) return;
+  var cWX = lngToWX(centerLng);
+  var cWY = latToWY(centerLat);
+  var W = wrap.clientWidth, H = wrap.clientHeight;
+  BAC.forEach(function(b) {
+    var pin = document.getElementById('bpin-' + b.id);
+    if (!pin || pin.classList.contains('bpin-hidden')) return;
+    var sx = lngToWX(b.lng) - cWX + W / 2;
+    var sy = latToWY(b.lat) - cWY + H / 2;
+    pin.style.left = sx + 'px';
+    pin.style.top  = sy + 'px';
+  });
+}
+
+// Patch render() to also position BAC markers
+var _origRender = render;
+render = function() {
+  _origRender();
+  renderBACMarkers();
+};
+
+function showBACPopup(b) {
+  popupImg.src = '';
+  popupImg.style.display = 'none';
+  popupTitle.textContent = b.title;
+  popupMeta.innerHTML =
+    '<span>🕐 ' + b.time + '</span>' +
+    '<span>📍 ' + b.loc + '</span>' +
+    '<span style="color:#f87171;font-weight:700">🗺 BAC Passport Trail</span>' +
+    '<span style="color:#f87171">📍 ' + b.zone + '</span>' +
+    '<span style="color:#6b7280">📅 Until May 31, 2026</span>';
+  var pin = document.getElementById('bpin-' + b.id);
+  var pw = 240, ph = 150;
+  var W = wrap.clientWidth, H = wrap.clientHeight;
+  var px = parseFloat(pin.style.left);
+  var py = parseFloat(pin.style.top);
+  var left = px + 20;
+  var top  = py - ph / 2;
+  if (left + pw > W - 10) left = px - pw - 20;
+  if (top < 10) top = 10;
+  if (top + ph > H - 10) top = H - ph - 10;
+  popup.style.left = left + 'px';
+  popup.style.top  = top + 'px';
+  popup.style.display = 'block';
+}
+
+// BAC Trail toggle pill
+var bacPill = document.querySelector('.pill[data-f="bac"]');
+if (bacPill) {
+  if (!BAC_ACTIVE) {
+    bacPill.style.display = 'none';
+  } else {
+    bacPill.addEventListener('click', function(e) {
+      e.stopPropagation(); // don't trigger the main pill handler
+      bacVisible = !bacVisible;
+      bacPill.classList.toggle('on', bacVisible);
+      BAC.forEach(function(b) {
+        var pin = document.getElementById('bpin-' + b.id);
+        if (pin) pin.classList.toggle('bpin-hidden', !bacVisible);
+      });
+      if (bacVisible) {
+        // Zoom to show all BAC venues
+        var lats = BAC.map(function(b) { return b.lat; });
+        var lngs = BAC.map(function(b) { return b.lng; });
+        centerLat = (Math.min.apply(null,lats) + Math.max.apply(null,lats)) / 2;
+        centerLng = (Math.min.apply(null,lngs) + Math.max.apply(null,lngs)) / 2;
+        zoom = 13;
+        loadedTiles = {};
+        tileLayer.innerHTML = '';
+      }
+      render();
+    });
+  }
+}
+
 </script>
 </body>
 </html>

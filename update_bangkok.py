@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Auto-updates index.html with the latest Timeout Bangkok weekend picks.
+Auto-updates index.html with the latest Timeout weekend picks for
+Bangkok, Singapore, Tokyo, and Hong Kong.
 Scheduled to run every Friday via Windows Task Scheduler.
 """
 
@@ -13,7 +14,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 HTML_FILE = Path(__file__).parent / "index.html"
-TIMEOUT_URL = "https://www.timeout.com/bangkok/things-to-do/the-best-things-to-do-in-bangkok-this-weekend"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
@@ -27,20 +27,59 @@ CAT_EMOJI = {
     "market": "🛍", "aquarium": "🌊", "nature": "🌿", "nightlife": "🌙", "community": "🐾"
 }
 
+# ── City definitions ──────────────────────────────────────────────────────────
+CITIES = {
+    "bangkok": {
+        "name":       "Bangkok, Thailand",
+        "url":        "https://www.timeout.com/bangkok/things-to-do/the-best-things-to-do-in-bangkok-this-weekend",
+        "var":        "A_BANGKOK",
+        "label_var":  "LABEL_BANGKOK",
+        "currency":   "฿",
+        # Bounding box: lat_min, lat_max, lng_min, lng_max
+        "bounds":     (13.50, 14.00, 100.30, 100.95),
+    },
+    "singapore": {
+        "name":       "Singapore",
+        "url":        "https://www.timeout.com/singapore/things-to-do/things-to-do-in-singapore-this-weekend",
+        "var":        "A_SINGAPORE",
+        "label_var":  "LABEL_SINGAPORE",
+        "currency":   "S$",
+        "bounds":     (1.15, 1.50, 103.60, 104.10),
+    },
+    "tokyo": {
+        "name":       "Tokyo, Japan",
+        "url":        "https://www.timeout.com/tokyo/things-to-do/things-to-do-in-tokyo-this-weekend",
+        "var":        "A_TOKYO",
+        "label_var":  "LABEL_TOKYO",
+        "currency":   "¥",
+        "bounds":     (35.50, 35.90, 139.40, 140.00),
+    },
+    "hongkong": {
+        "name":       "Hong Kong",
+        "url":        "https://www.timeout.com/hong-kong/things-to-do/things-to-do-in-hong-kong-this-weekend",
+        "var":        "A_HONGKONG",
+        "label_var":  "LABEL_HONGKONG",
+        "currency":   "HK$",
+        "bounds":     (22.15, 22.55, 113.80, 114.45),
+    },
+}
+
+
 def fetch_page(url: str) -> str:
-    print(f"Fetching {url} ...")
+    print(f"  Fetching {url} ...")
     r = requests.get(url, headers=HEADERS, timeout=20)
     r.raise_for_status()
     return r.text
 
 
-def extract_activities(html: str) -> list[dict]:
+def extract_activities(html: str, city_key: str) -> list[dict]:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY environment variable not set.")
-    print("Asking Claude to parse activities...")
+    city = CITIES[city_key]
+    print(f"  Asking Claude to parse activities for {city['name']}...")
 
-    prompt = f"""You are parsing a Timeout Bangkok weekend activities article.
+    prompt = f"""You are parsing a Timeout weekend activities article for {city['name']}.
 Extract every activity/event listed. Return ONLY a valid JSON array — no markdown, no explanation.
 
 Each item must have exactly these keys:
@@ -49,24 +88,25 @@ Each item must have exactly these keys:
   cat       (string, exactly one of: art / music / pop-up / film / market / aquarium / nature / nightlife / community)
   e         (string, single emoji matching the category)
   loc       (string, venue + neighbourhood)
-  lat       (number, Bangkok GPS latitude, e.g. 13.7469)
-  lng       (number, Bangkok GPS longitude, e.g. 100.5316)
+  lat       (number, GPS latitude for {city['name']})
+  lng       (number, GPS longitude for {city['name']})
   time      (string, opening hours or time)
   until     (string, end date or "Ongoing")
-  price     (string, e.g. "Free" or "฿300")
+  price     (string, e.g. "Free" or "{city['currency']}300")
   free      (integer, 1 if free entry, else 0)
   desc      (string, one punchy sentence)
   img       (string, full image URL from the article, or "" if none found)
 
 Category emoji guide: art=🎨 music=🎵 pop-up=⭐ film=🎬 market=🛍 aquarium=🌊 nature=🌿 nightlife=🌙 community=🐾
 
-For lat/lng use your knowledge of Bangkok venues. If unsure, use the neighbourhood centre.
+IMPORTANT: For lat/lng use your knowledge of real venue locations in {city['name']}.
+Coordinates must be accurate — wrong pins make the map useless.
+Bounding box for sanity: lat {city['bounds'][0]}–{city['bounds'][1]}, lng {city['bounds'][2]}–{city['bounds'][3]}
 
 HTML content (truncated to first 80 000 chars):
 {html[:80000]}
 """
 
-    # Raw HTTP call — no SDK, no pydantic, no DLL issues
     resp = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={
@@ -79,12 +119,12 @@ HTML content (truncated to first 80 000 chars):
             "max_tokens": 6000,
             "messages": [{"role": "user", "content": prompt}],
         },
-        timeout=60,
+        timeout=90,
     )
     resp.raise_for_status()
     raw = resp.json()["content"][0]["text"].strip()
 
-    # Strip markdown code fences if Claude wrapped the JSON
+    # Strip markdown code fences if present
     raw = re.sub(r"^```[a-z]*\n?", "", raw)
     raw = re.sub(r"\n?```$", "", raw)
 
@@ -103,38 +143,55 @@ HTML content (truncated to first 80 000 chars):
     return activities
 
 
+def audit_coordinates(city_key: str, activities: list[dict]) -> None:
+    """Warn about coordinates outside the city bounding box."""
+    city = CITIES[city_key]
+    lat_min, lat_max, lng_min, lng_max = city["bounds"]
+    bad = []
+    for a in activities:
+        lat, lng = a.get("lat", 0), a.get("lng", 0)
+        if not (lat_min <= lat <= lat_max and lng_min <= lng <= lng_max):
+            bad.append(f"    ⚠ id={a['id']} '{a['title']}': lat={lat}, lng={lng}")
+    if bad:
+        print(f"  → COORDINATE AUDIT: {len(bad)} suspect pin(s) in {city['name']}:")
+        for b in bad:
+            print(b)
+    else:
+        print(f"  → Coordinate audit: all {len(activities)} pins within {city['name']} bounds ✓")
+
+
 def weekend_label() -> str:
     today = datetime.now()
-    # Find the coming Saturday (weekday=5); if today is Saturday get next one
     days_ahead = (5 - today.weekday()) % 7 or 7
     saturday = today + timedelta(days=days_ahead)
     sunday = saturday + timedelta(days=1)
     return f"{saturday.strftime('%b')} {saturday.day}–{sunday.day}, {sunday.year}"
 
 
-def update_html(activities: list[dict]) -> str:
+def update_html_city(city_key: str, activities: list[dict], label: str) -> None:
+    """Replace one city's data array and label variable in index.html."""
+    city = CITIES[city_key]
     html = HTML_FILE.read_text(encoding="utf-8")
 
-    # Replace ACTIVITIES array
-    new_js = "var A = " + json.dumps(activities, ensure_ascii=False, separators=(", ", ":")) + ";"
-    html, n = re.subn(r"var A = \[.*?\];", new_js, html, flags=re.DOTALL)
+    # Replace var A_CITYKEY = [...];
+    var_name = city["var"]
+    new_js = f"var {var_name} = " + json.dumps(activities, ensure_ascii=False, separators=(", ", ":")) + ";"
+    html, n = re.subn(rf"var {var_name} = \[.*?\];", new_js, html, flags=re.DOTALL)
     if n == 0:
-        raise ValueError("Could not find 'var A = [...]' in HTML file — pattern mismatch.")
+        raise ValueError(f"Could not find 'var {var_name} = [...]' in HTML — pattern mismatch.")
 
-    # Replace weekend date label in the subtitle
-    label = weekend_label()
-    html = re.sub(
-        r"(\d+ picks · Timeout Bangkok · ).*",
-        rf"{len(activities)} picks · Timeout Bangkok · {label}",
+    # Replace var LABEL_CITYKEY = "...";
+    label_var = city["label_var"]
+    html, n = re.subn(
+        rf'var {label_var} = "[^"]*";',
+        f'var {label_var} = "{label}";',
         html
     )
-
-    # Update filter pill count
-    html = re.sub(r"All \d+", f"All {len(activities)}", html)
+    if n == 0:
+        raise ValueError(f"Could not find 'var {label_var} = \"...\"' in HTML — pattern mismatch.")
 
     HTML_FILE.write_text(html, encoding="utf-8")
-    print(f"  → {HTML_FILE} updated ({len(activities)} activities, dates: {label})")
-    return label
+    print(f"  → {city_key} updated in HTML ({len(activities)} activities, {label})")
 
 
 def git_push(label: str) -> None:
@@ -142,7 +199,7 @@ def git_push(label: str) -> None:
     repo = HTML_FILE.parent
     cmds = [
         ["git", "add", "index.html"],
-        ["git", "commit", "-m", f"Auto-update: Bangkok weekend picks {label}"],
+        ["git", "commit", "-m", f"Auto-update: weekend picks {label} (all cities)"],
         ["git", "push"],
     ]
     for cmd in cmds:
@@ -153,38 +210,38 @@ def git_push(label: str) -> None:
     print("  → Pushed to GitHub → Vercel will redeploy automatically")
 
 
-# Bangkok bounding box for coordinate sanity checks
-BKK_LAT = (13.50, 14.00)
-BKK_LNG = (100.30, 100.95)
-
-
-def audit_coordinates(activities: list[dict]) -> None:
-    """Warn about any activity coordinates that fall outside Bangkok's bounding box."""
-    print("Auditing activity coordinates...")
-    bad = []
-    for a in activities:
-        lat, lng = a.get("lat", 0), a.get("lng", 0)
-        if not (BKK_LAT[0] <= lat <= BKK_LAT[1] and BKK_LNG[0] <= lng <= BKK_LNG[1]):
-            bad.append(f"  ⚠ id={a['id']} '{a['title']}': lat={lat}, lng={lng} — outside Bangkok!")
-    if bad:
-        print(f"  → {len(bad)} suspect coordinate(s):")
-        for b in bad:
-            print(b)
-    else:
-        print(f"  → All {len(activities)} activity coordinates look correct ✓")
-
-
 def main():
-    try:
-        html = fetch_page(TIMEOUT_URL)
-        activities = extract_activities(html)
-        audit_coordinates(activities)
-        label = update_html(activities)
-        git_push(label)
-        print("Done ✓")
-    except Exception as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+    label = weekend_label()
+    print(f"Weekend label: {label}\n")
+
+    failed = []
+    city_keys = list(CITIES.keys())
+    for i, city_key in enumerate(city_keys):
+        print(f"── {CITIES[city_key]['name']} ──────────────────────────")
+        try:
+            html = fetch_page(CITIES[city_key]["url"])
+            activities = extract_activities(html, city_key)
+            audit_coordinates(city_key, activities)
+            update_html_city(city_key, activities, label)
+        except Exception as e:
+            print(f"  ERROR: {e}", file=sys.stderr)
+            failed.append(city_key)
+        print()
+        # Brief pause between cities to avoid API rate limits
+        if i < len(city_keys) - 1:
+            import time
+            time.sleep(5)
+
+    if len(failed) == len(CITIES):
+        print("All cities failed — not pushing.", file=sys.stderr)
         sys.exit(1)
+
+    if failed:
+        print(f"Note: {len(failed)} city/cities failed but others succeeded — pushing partial update.")
+        print(f"  Failed: {', '.join(failed)}")
+
+    git_push(label)
+    print("\nDone ✓")
 
 
 if __name__ == "__main__":

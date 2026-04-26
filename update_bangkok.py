@@ -153,10 +153,32 @@ def git_push(label: str) -> None:
     print("  → Pushed to GitHub → Vercel will redeploy automatically")
 
 
+# Bangkok bounding box for coordinate sanity checks
+BKK_LAT = (13.50, 14.00)
+BKK_LNG = (100.30, 100.95)
+
+
+def audit_coordinates(activities: list[dict]) -> None:
+    """Warn about any activity coordinates that fall outside Bangkok's bounding box."""
+    print("Auditing activity coordinates...")
+    bad = []
+    for a in activities:
+        lat, lng = a.get("lat", 0), a.get("lng", 0)
+        if not (BKK_LAT[0] <= lat <= BKK_LAT[1] and BKK_LNG[0] <= lng <= BKK_LNG[1]):
+            bad.append(f"  ⚠ id={a['id']} '{a['title']}': lat={lat}, lng={lng} — outside Bangkok!")
+    if bad:
+        print(f"  → {len(bad)} suspect coordinate(s):")
+        for b in bad:
+            print(b)
+    else:
+        print(f"  → All {len(activities)} activity coordinates look correct ✓")
+
+
 def main():
     try:
         html = fetch_page(TIMEOUT_URL)
         activities = extract_activities(html)
+        audit_coordinates(activities)
         label = update_html(activities)
         git_push(label)
         print("Done ✓")

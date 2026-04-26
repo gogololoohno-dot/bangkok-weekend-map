@@ -119,6 +119,7 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
 #tile-layer { position:absolute; top:0; left:0; }
 #tile-layer img { position:absolute; width:256px; height:256px; display:block; image-rendering:auto; }
 #marker-layer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+#map-content { position:absolute; top:0; left:0; width:100%; height:100%; }
 .mpin {
   position:absolute; pointer-events:all; cursor:pointer;
   display:flex; align-items:center; gap:6px;
@@ -239,8 +240,10 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
   <aside id="sidebar"></aside>
 
   <div id="map-wrap">
-    <div id="tile-layer"></div>
-    <div id="marker-layer"></div>
+    <div id="map-content">
+      <div id="tile-layer"></div>
+      <div id="marker-layer"></div>
+    </div>
 
     <div id="zoom-btns">
       <div class="zbtn" id="btn-in">+</div>
@@ -305,6 +308,8 @@ var centerLat = 13.748, centerLng = 100.520;
 var wrap = document.getElementById('map-wrap');
 var tileLayer = document.getElementById('tile-layer');
 var markerLayer = document.getElementById('marker-layer');
+var mapContent = document.getElementById('map-content');
+var zoomAnimating = false;
 
 function deg2rad(d) { return d * Math.PI / 180; }
 
@@ -477,6 +482,7 @@ function shiftCenter(dx, dy) {
 
 function startDrag(x, y) {
   if (inertiaRaf) { cancelAnimationFrame(inertiaRaf); inertiaRaf = null; }
+  mapContent.style.transition = '';  // cancel any in-flight zoom animation
   drag.on = true;
   drag.startX = x; drag.startY = y;
   drag.dx = 0; drag.dy = 0;
@@ -488,7 +494,7 @@ function moveDrag(x, y) {
   drag.dx = x - drag.startX;
   drag.dy = y - drag.startY;
   var t = 'translate(' + drag.dx + 'px,' + drag.dy + 'px)';
-  tileLayer.style.transform = markerLayer.style.transform = t;
+  mapContent.style.transform = t;
   var now = Date.now();
   velSamples.push({ dx: drag.dx, dy: drag.dy, t: now });
   velSamples = velSamples.filter(function(s) { return now - s.t < 80; });
@@ -497,7 +503,7 @@ function endDrag() {
   if (!drag.on) return;
   drag.on = false;
   wrap.classList.remove('dragging');
-  tileLayer.style.transform = markerLayer.style.transform = '';
+  mapContent.style.transform = '';
   shiftCenter(drag.dx, drag.dy);
   render();
 
@@ -527,27 +533,122 @@ wrap.addEventListener('mousedown', function(e) {
 window.addEventListener('mousemove', function(e) { moveDrag(e.clientX, e.clientY); });
 window.addEventListener('mouseup', endDrag);
 
-// Touch
+// Touch — single-finger pan + two-finger pinch-to-zoom
+var pinch = { on: false, initDist: 1, midX: 0, midY: 0 };
+
+function getTouchDist(touches) {
+  var dx = touches[0].clientX - touches[1].clientX;
+  var dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 wrap.addEventListener('touchstart', function(e) {
   if (e.target.closest('.mpin') || e.target.closest('.bpin') || e.target.closest('#popup') || e.target.closest('#zoom-btns')) return;
-  if (e.touches.length !== 1) return;
-  startDrag(e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: true });
-wrap.addEventListener('touchmove', function(e) {
-  if (e.touches.length !== 1) return;
-  moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-  e.preventDefault();
+  if (e.touches.length === 2) {
+    // A second finger arrived — commit any in-progress single drag and start pinch
+    if (drag.on) {
+      drag.on = false;
+      wrap.classList.remove('dragging');
+      mapContent.style.transform = '';
+      shiftCenter(drag.dx, drag.dy);
+    }
+    var rect = wrap.getBoundingClientRect();
+    pinch.on = true;
+    pinch.initDist = getTouchDist(e.touches);
+    pinch.midX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+    pinch.midY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+    e.preventDefault();
+  } else if (e.touches.length === 1 && !pinch.on) {
+    startDrag(e.touches[0].clientX, e.touches[0].clientY);
+  }
 }, { passive: false });
-wrap.addEventListener('touchend', endDrag);
+
+wrap.addEventListener('touchmove', function(e) {
+  e.preventDefault();
+  if (e.touches.length === 2 && pinch.on) {
+    var scale = getTouchDist(e.touches) / pinch.initDist;
+    mapContent.style.transformOrigin = pinch.midX + 'px ' + pinch.midY + 'px';
+    mapContent.style.transform = 'scale(' + scale + ')';
+  } else if (e.touches.length === 1 && drag.on) {
+    moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+  }
+}, { passive: false });
+
+wrap.addEventListener('touchend', function(e) {
+  if (pinch.on) {
+    if (e.touches.length >= 2) return;  // still two or more fingers down
+    pinch.on = false;
+
+    // Read the scale that was visually applied
+    var m = mapContent.style.transform.match(/scale\(([^)]+)\)/);
+    var scale = m ? parseFloat(m[1]) : 1;
+    mapContent.style.transform = '';
+    mapContent.style.transformOrigin = '';
+
+    // Snap to nearest integer zoom level
+    var newZoom = Math.round(zoom + Math.log2(scale));
+    newZoom = Math.min(17, Math.max(10, newZoom));
+    if (newZoom !== zoom) {
+      var W = wrap.clientWidth, H = wrap.clientHeight;
+      var scaleFactor = Math.pow(2, newZoom - zoom);
+      var dx = pinch.midX - W / 2;
+      var dy = pinch.midY - H / 2;
+      var cWX = lngToWX(centerLng);
+      var cWY = latToWY(centerLat);
+      zoom = newZoom;
+      var newCWX = (cWX + dx) * scaleFactor - dx;
+      var newCWY = (cWY + dy) * scaleFactor - dy;
+      var tileTotal = Math.pow(2, zoom);
+      centerLng = Math.max(-180, Math.min(180, newCWX / (TILE * tileTotal) * 360 - 180));
+      var n = Math.PI - 2 * Math.PI * newCWY / (TILE * tileTotal);
+      centerLat = Math.atan(Math.sinh(n)) * 180 / Math.PI;
+    }
+    loadedTiles = {};
+    tileLayer.innerHTML = '';
+    render();
+  } else {
+    endDrag();
+  }
+});
 
 // ── Zoom ─────────────────────────────────────────────────────────────────────
-function changeZoom(delta) {
+function changeZoom(delta, originX, originY) {
+  if (zoomAnimating) return;
   var newZoom = Math.min(17, Math.max(10, zoom + delta));
   if (newZoom === zoom) return;
+
+  var W = wrap.clientWidth, H = wrap.clientHeight;
+  var ox = (originX !== undefined) ? originX : W / 2;
+  var oy = (originY !== undefined) ? originY : H / 2;
+  var scaleFactor = Math.pow(2, delta);
+
+  // Shift center so the point under (ox, oy) stays fixed after zoom
+  var cWX = lngToWX(centerLng);
+  var cWY = latToWY(centerLat);
+  var dx = ox - W / 2;
+  var dy = oy - H / 2;
   zoom = newZoom;
-  loadedTiles = {};
-  tileLayer.innerHTML = '';
-  render();
+  var newCWX = (cWX + dx) * scaleFactor - dx;
+  var newCWY = (cWY + dy) * scaleFactor - dy;
+  var tileTotal = Math.pow(2, zoom);
+  centerLng = Math.max(-180, Math.min(180, newCWX / (TILE * tileTotal) * 360 - 180));
+  var n = Math.PI - 2 * Math.PI * newCWY / (TILE * tileTotal);
+  centerLat = Math.atan(Math.sinh(n)) * 180 / Math.PI;
+
+  // Animate scale from origin, then swap tiles at the new zoom
+  zoomAnimating = true;
+  mapContent.style.transformOrigin = ox + 'px ' + oy + 'px';
+  mapContent.style.transition = 'transform 0.18s ease-out';
+  mapContent.style.transform = 'scale(' + scaleFactor + ')';
+  setTimeout(function() {
+    mapContent.style.transition = '';
+    mapContent.style.transform = '';
+    mapContent.style.transformOrigin = '';
+    loadedTiles = {};
+    tileLayer.innerHTML = '';
+    render();
+    zoomAnimating = false;
+  }, 180);
 }
 
 document.getElementById('btn-in').addEventListener('click', function() { changeZoom(1); });
@@ -555,7 +656,8 @@ document.getElementById('btn-out').addEventListener('click', function() { change
 
 wrap.addEventListener('wheel', function(e) {
   e.preventDefault();
-  changeZoom(e.deltaY < 0 ? 1 : -1);
+  var rect = wrap.getBoundingClientRect();
+  changeZoom(e.deltaY < 0 ? 1 : -1, e.clientX - rect.left, e.clientY - rect.top);
 }, { passive: false });
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────

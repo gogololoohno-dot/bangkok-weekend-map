@@ -42,6 +42,21 @@ header {
 .pill[data-f="nightlife"].on { background:#a855f7; border-color:#a855f7; }
 .pill[data-f="community"].on { background:#f43f5e; border-color:#f43f5e; }
 
+/* City tabs */
+.city-tabs {
+  background:#111827; border-bottom:1px solid #374151;
+  padding:5px 14px; display:flex; gap:5px; flex-shrink:0;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+.city-tabs::-webkit-scrollbar { display:none; }
+.ctab {
+  font-size:0.67rem; font-weight:700; padding:4px 12px; border-radius:20px;
+  border:1px solid #374151; background:#1f2937; color:#9ca3af;
+  cursor:pointer; user-select:none; flex-shrink:0; transition:all 0.15s;
+}
+.ctab:hover { border-color:#9ca3af; color:#e2e8f0; }
+.ctab.on { background:#f97316; border-color:#f97316; color:#fff; }
+
 .layout { display:flex; flex:1; min-height:0; }
 
 aside {
@@ -215,11 +230,18 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
 <header>
   <span style="font-size:1.3rem">🗺</span>
   <div>
-    <div class="htitle">Bangkok This Weekend</div>
-    <div class="hsub">7 picks · Timeout Bangkok · Apr 25–26, 2026
+    <div class="htitle" id="city-title">Bangkok This Weekend</div>
+    <div class="hsub" id="city-sub">26 picks · Timeout Bangkok · Apr 25–26, 2026</div>
   </div>
   <div class="badge">LIVE</div>
 </header>
+
+<div class="city-tabs">
+  <span class="ctab on" data-city="bangkok">🇹🇭 Bangkok</span>
+  <span class="ctab" data-city="singapore">🇸🇬 Singapore</span>
+  <span class="ctab" data-city="tokyo">🇯🇵 Tokyo</span>
+  <span class="ctab" data-city="hongkong">🇭🇰 Hong Kong</span>
+</div>
 
 <div class="filters">
   <label>Filter: </label>
@@ -264,35 +286,21 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
 </div>
 
 <script>
-// ── Data ─────────────────────────────────────────────────────────────────────
-var A = [
-  { id:1,  title:"Sea Reverie",                      cat:"art",       e:"🎨", loc:"KYLA Gallery & Wine Bar, Silom",        lat:13.7265, lng:100.5248, time:"15:00–00:00",         until:"Until May 3",   price:"Free",          free:1, desc:"Solo show by Passakorn Pachana — seascapes that hover between recollection and shifting tide, using colour to move from turbulent to calm. KYLA is also a wine bar so you can linger with a glass.", img:"https://media.timeout.com/images/106397002/750/562/image.jpg" },
-  { id:2,  title:"Passione Italiana — Espresso Art",  cat:"art",       e:"🎨", loc:"Nextopia, Siam Paragon, Siam",          lat:13.7463, lng:100.5349, time:"10:00–19:00",         until:"Until May 12",  price:"Free",          free:1, desc:"Historic espresso machines paired with Alessandro Mendini's sculptural designs. Evening Jazz & Coffee sessions with Bruno Brugnano and Bangkok New Trio — one of the more unusual free events in the city this weekend.", img:"https://media.timeout.com/images/106397003/750/562/image.jpg" },
-  { id:3,  title:"Moviemov Italian Film Festival",    cat:"film",      e:"🎬", loc:"House Samyan, Samyan",                  lat:13.7295, lng:100.5219, time:"Check schedule",      until:"Until Apr 24",  price:"Free",          free:1, desc:"Contemporary Italian cinema that moves easily between humour, tension and everyday detail. Tickets available one hour before showtime on a first-come basis — arrive early.", img:"https://media.timeout.com/images/106397004/750/562/image.jpg" },
-  { id:4,  title:"Burapa Eastern Thai Lunch",         cat:"community", e:"🐾", loc:"Burapa, Sukhumvit Soi 11, Nana",        lat:13.7415, lng:100.5596, time:"11:00–14:00 daily",   until:"Ongoing",       price:"฿530–฿550",     free:0, desc:"Lunch sets from Thailand's eastern provinces with a lighter, modern touch. ฿550 regular or ฿530 vegetarian — includes a main, up to three sides, plus drink or dessert. Great value in the Nana area.", img:"https://media.timeout.com/images/106397005/750/562/image.jpg" },
-  { id:5,  title:"Blues Dance Night @ O.S.S. Bar",    cat:"nightlife", e:"🌙", loc:"The O.S.S. Bar, Bangkok",               lat:13.7480, lng:100.5290, time:"18:00 onwards",       until:"Apr 23 only",   price:"฿500–฿700",     free:0, desc:"Beginner blues dance workshop followed by live music and a DJ set. Rooted in African American dance tradition — all levels welcome, no partner needed. Book in advance for ฿500 or pay ฿700 at the door.", img:"https://media.timeout.com/images/106397006/750/562/image.jpg" },
-  { id:6,  title:"Record Fest BKK",                   cat:"music",     e:"🎵", loc:"NEX HALL, Siam Paragon, Siam",          lat:13.7460, lng:100.5345, time:"10:00–22:00",         until:"Apr 24–26",     price:"฿200",          free:0, desc:"40+ vendor booths with vinyl, tapes and CDs. Live DJ sets, mini gigs, fan signings, NFC keychain crafting, record painting, and a 500-strong vinyl library to test on turntables. The biggest record event in Bangkok this weekend.", img:"https://media.timeout.com/images/106397008/750/562/image.jpg" },
-  { id:7,  title:"DJ Spiller at Clutch",              cat:"nightlife", e:"🌙", loc:"The Warehouse Bangkok, Yaowarat",        lat:13.7390, lng:100.5140, time:"18:00 onwards",       until:"Apr 24 only",   price:"฿800",          free:0, desc:"Italian DJ Spiller — the man behind disco-house classics — brings warm basslines and uplifting hooks to Clutch. Book on Ticketmelon in advance. One night only.", img:"https://media.timeout.com/images/106397010/750/562/image.jpg" },
-  { id:8,  title:"Vinyl Palooza",                     cat:"music",     e:"🎵", loc:"The Warehouse Bangkok, Yaowarat",        lat:13.7392, lng:100.5142, time:"14:00–22:00",         until:"Apr 24–26",     price:"Free",          free:1, desc:"Three days of crate digging afternoons and late-night dancing. Rotating DJs each day (Soisipsee/Dave Soul Fri · Tom FKG/Ruggero Sat · Vim/JDJ Sun). Audio gear demos from AlphaTheta, JBL and Denon. Free entry.", img:"https://media.timeout.com/images/106397011/750/562/image.jpg" },
-  { id:9,  title:"International Jazz Celebration",    cat:"music",     e:"🎵", loc:"Siwilai Sound Club, Ploenchit",         lat:13.7440, lng:100.5497, time:"21:00–00:00",         until:"Apr 24–26",     price:"฿700–฿1,800",   free:0, desc:"Fifth-year programme spanning 1930s swing through 1970s experimental jazz, with international and local artists improvising across wildly different styles. One of Bangkok's top annual jazz events — book ahead.", img:"https://media.timeout.com/images/106396928/750/562/image.jpg" },
-  { id:10, title:"Little Market on Charoen Krung",   cat:"market",    e:"🛍", loc:"Charoen Krung Soi 43, Charoenkrung",    lat:13.7205, lng:100.5157, time:"13:00–19:00",         until:"Apr 25–26",     price:"Free",          free:1, desc:"Nine indie shops in a charming alley: suncatcher workshop, custom flower arrangements, matcha bar, vinyl, art and cycling community. One of Bangkok's most relaxed and walkable weekend markets.", img:"https://media.timeout.com/images/106397013/750/562/image.jpg" },
-  { id:11, title:"The StandardX Market Things",       cat:"market",    e:"🛍", loc:"The StandardX, Phra Arthit, Rattanakosin",lat:13.7612,lng:100.4934, time:"10:00–19:00",        until:"Apr 25–26",     price:"Free",          free:1, desc:"Relaxed market in Rattanakosin with handmade books, woven bags, recycled jewellery, photography and small art. Workshops available throughout the day in a beautiful riverside setting.", img:"https://media.timeout.com/images/106397014/750/562/image.jpg" },
-  { id:12, title:"Jazz at The Commons Thonglor",      cat:"music",     e:"🎵", loc:"The Commons Thonglor, Thonglor",        lat:13.7316, lng:100.5831, time:"19:00–00:00",         until:"Apr 25 only",   price:"Free",          free:1, desc:"SWEETS Jazz Community blending standards, classics and popular tracks reworked with a soulful edge. Relaxed, convivial atmosphere with food. Completely free — one of the best value evenings this weekend.", img:"https://media.timeout.com/images/106396943/750/562/image.jpg" },
-  { id:13, title:"Bangkok Art Walk",                  cat:"art",       e:"🎨", loc:"Chakraphong & Lan Luang Roads",          lat:13.7578, lng:100.4994, time:"14:00–22:00",         until:"Apr 25–26",     price:"Free",          free:1, desc:"Phase one of six weekends: art, books, vinyl and cassettes across Chakraphong and Lan Luang Roads. Later phases add street art, fashion, cycling, plants and pets. Free, outdoors, and very Bangkok.", img:"https://media.timeout.com/images/106397017/750/562/image.jpg" },
-  { id:14, title:"Tai Chi with DJ GUNGUN",            cat:"community", e:"🐾", loc:"The Commons Thonglor, Thonglor",        lat:13.7318, lng:100.5833, time:"10:00–11:30 (Sun)",   until:"Apr 26 only",   price:"Free",          free:1, desc:"A gentle Sunday morning: tai chi set to DJ GUNGUN's selections, fan decorating by Studio Cantalove, then matcha tasting by Seven Suns. Two time slots (10am or 11am). Register free on Ticketmelon.", img:"https://media.timeout.com/images/106397018/750/562/image.jpg" },
-  { id:15, title:"Dial-A-Poem Thailand",              cat:"art",       e:"🎨", loc:"Bangkok Kunsthalle, Yaowarat",           lat:13.7395, lng:100.5065, time:"14:00–20:00",         until:"Ongoing",       price:"Free",          free:1, desc:"35 Thai artists across text, image, film, sound and performance. Call +66 97-531-0708 or use the installation phones to hear random poetry readings — from street culture to monastic chants. Unmissable.", img:"https://media.timeout.com/images/106397019/750/562/image.jpg" },
-  { id:16, title:"Sant Jordi Festival",               cat:"market",    e:"🛍", loc:"GalileOasis, Phaya Thai",               lat:13.7525, lng:100.5307, time:"10:00–19:00 (Sun)",   until:"Apr 26 only",   price:"Free",          free:1, desc:"Book fair inspired by Barcelona's Sant Jordi tradition — books, prints and crafts. Free Spanish paella from La Cava Phuket served 1pm–2pm only. Get there early for the paella!", img:"https://media.timeout.com/images/106393009/750/562/image.jpg" },
-  { id:17, title:"Saneh Art by Songkran Festival",    cat:"art",       e:"🎨", loc:"Entertainment Plaza, Lumpini Park",     lat:13.7291, lng:100.5400, time:"10:00–20:00 daily",   until:"Until Apr 30",  price:"Free",          free:1, desc:"Large-scale sculptures by internationally recognised Thai artists across Lumpini Park — the post-Songkran slowdown makes this the perfect weekend to visit. Free, relaxed, and great for an afternoon walk.", img:"https://media.timeout.com/images/106394907/750/562/image.jpg" },
-  { id:18, title:'Museum Pier — "Wind" Exhibition',   cat:"art",       e:"🎨", loc:"Museum Pier, Rattanakosin",              lat:13.7543, lng:100.4923, time:"10:00–18:00",         until:"Until Apr 30",  price:"Free",          free:1, desc:"Noo Monthip's cross-disciplinary work across voice, music, fashion and image. Ground floor invites quiet reflection; upper levels bring sound, images and fashion collaborations with a deeply personal quality.", img:"https://media.timeout.com/images/106387480/750/562/image.jpg" },
-  { id:19, title:"24 Eyes of Hope — Free Pet Surgery",cat:"community", e:"🐾", loc:"Thonglor Pet Hospital, Thonglor",       lat:13.7265, lng:100.5853, time:"Apply via Facebook",  until:"Until Apr 30",  price:"Free (selected)",free:1, desc:"12 animals selected for free cataract surgery. Submit a short video or written piece explaining what your pet should see first if their sight returns. Apply via the hospital's Facebook page.", img:"https://media.timeout.com/images/106394917/750/562/image.jpg" },
-  { id:20, title:"OFF THE RADAR — We Rise",           cat:"art",       e:"🎨", loc:"Bangkok Art & Culture Centre, Siam",    lat:13.7469, lng:100.5316, time:"10:00–20:00",         until:"Until May 31",  price:"Free",          free:1, desc:"Thai artists over 40 working without institutional backing — paintings, sculpture and installation addressing precarity and resilience. Workshops throughout May. Right next to BTS Siam, free entry.", img:"https://media.timeout.com/images/106392292/750/562/image.jpg" },
-  { id:21, title:"Sea Life — Bioluminescent",         cat:"aquarium",  e:"🌊", loc:"Sea Life Bangkok, Siam Paragon",        lat:13.7466, lng:100.5350, time:"10:00–21:00 daily",   until:"Until Sep 20",  price:"From ฿449",     free:0, desc:"Nocturnal ocean experience with glowing jellyfish, neon interactive walls, shark tunnel with ripple effects, and a northern lights simulation over the penguins. Book online for a discount. Inside Siam Paragon.", img:"https://media.timeout.com/images/106389283/750/562/image.jpg" },
-  { id:22, title:"Self-Sovereignty Exhibition",       cat:"art",       e:"🎨", loc:"Joyman Gallery, Rattanakosin",           lat:13.7498, lng:100.4978, time:"11:00–18:00",         until:"Until May 3",   price:"Free",          free:1, desc:"Thanwa Huangsmut's figures caught mid-shift between movement and control — asking how much space a person can truly claim. Assured brushwork with colour that feels almost unruly. Worth the trip to Rattanakosin.", img:"https://media.timeout.com/images/106390470/750/562/image.jpg" },
-  { id:23, title:"In the Midst of Gray",             cat:"art",       e:"🎨", loc:"Supples Gallery, Charoenkrung",          lat:13.7207, lng:100.5140, time:"11:00–18:00",         until:"Until May 3",   price:"Free",          free:1, desc:"Works following character Chawky through emotional uncertainty — the in-between state of growing up, where feelings refuse to fade. Pair with a walk along the Charoenkrung riverfront and a café stop.", img:"https://media.timeout.com/images/106387481/750/562/image.jpg" },
-  { id:24, title:"Concrete Dream — Graffiti Show",    cat:"art",       e:"🎨", loc:"Maison JE Bangkok, Surawong",            lat:13.7255, lng:100.5250, time:"11:00–19:00",         until:"Until May 3",   price:"Free",          free:1, desc:"Seven artists from Thailand, France and Switzerland using graffiti as shared language — from sharp lettering to loose abstract murals. One of the most visually striking free shows in Bangkok right now.", img:"https://media.timeout.com/images/106384907/750/562/image.jpg" },
-  { id:25, title:"BAC Passport Art Trail",            cat:"art",       e:"🎨", loc:"27 art spaces across Bangkok",           lat:13.7520, lng:100.4950, time:"Varies by venue",     until:"Until May 31",  price:"Free",          free:1, desc:"Pocket passport across four routes through Old Town and the riverbank — 27 destinations, collect stamps for artist-made souvenirs. Pick up at BACC, Ratchadamnoen, Bangkok City Library or Chula Museum.", img:"https://media.timeout.com/images/106377574/750/562/image.jpg" },
-  { id:26, title:"One Piece Pop-Up @ ICONSIAM",       cat:"pop-up",    e:"⭐", loc:"ICONSIAM, Charoennakhon",               lat:13.7247, lng:100.5136, time:"10:00–20:30 daily",   until:"Until Oct 31",  price:"Free",          free:1, desc:"600 sq-m immersive space with walkable sets from past arcs, newly issued wanted posters, 10-zone stamp trail and a 5-metre Gear 5 Luffy statue. Free to enter, merch and food available inside.", img:"https://media.timeout.com/images/106383451/750/562/image.jpg" }
-];
+// ── Data: Bangkok ────────────────────────────────────────────────────────────
+var A_BANGKOK = [{"id":1, "title":"Sea Reverie", "cat":"art", "e":"🎨", "loc":"Bangkok, Thailand", "lat":13.7563, "lng":100.5018, "time":"Ongoing", "until":"Ongoing", "price":"", "free":0, "desc":"Passakorn Pachana's shifting seascapes sit somewhere between memory and horizon.", "img":""}, {"id":2, "title":"Moviemov Italian Film Festival", "cat":"film", "e":"🎬", "loc":"Bangkok, Thailand", "lat":13.7563, "lng":100.5018, "time":"Ongoing", "until":"Ongoing", "price":"", "free":0, "desc":"A tightly curated slice of contemporary Italian cinema comes to local screens.", "img":""}, {"id":3, "title":"Record Fest BKK", "cat":"music", "e":"🎵", "loc":"Bangkok, Thailand", "lat":13.7563, "lng":100.5018, "time":"Weekend", "until":"Ongoing", "price":"", "free":0, "desc":"Record crate digging and live sets return to Bangkok.", "img":"https://media.timeout.com/images/106397022/image.jpg"}, {"id":4, "title":"DJ Spiller", "cat":"nightlife", "e":"🌙", "loc":"Bangkok, Thailand", "lat":13.7563, "lng":100.5018, "time":"Evening", "until":"Ongoing", "price":"", "free":0, "desc":"A one-night session with serious disco-house weight.", "img":""}, {"id":5, "title":"The International Jazz Celebration", "cat":"music", "e":"🎵", "loc":"Charoen Krung, Bangkok", "lat":13.7281, "lng":100.5075, "time":"Weekend", "until":"Ongoing", "price":"", "free":0, "desc":"Jazz celebration spreads across multiple venues on Charoen Krung with standards and newer sounds.", "img":""}, {"id":6, "title":"Little Market", "cat":"market", "e":"🛍", "loc":"Bangkok, Thailand", "lat":13.7563, "lng":100.5018, "time":"Weekend", "until":"Ongoing", "price":"Free", "free":1, "desc":"Low-key market with crafts, food and small finds worth lingering over.", "img":""}, {"id":7, "title":"Bangkok Art Walk", "cat":"art", "e":"🎨", "loc":"Bangkok, Thailand", "lat":13.7563, "lng":100.5018, "time":"Multiple dates", "until":"Ongoing", "price":"Free", "free":1, "desc":"Art walk taking over streets with a mix of art, vinyl, books and outdoor activities.", "img":""}];
+var LABEL_BANGKOK = "May 2–3, 2026";
+
+// ── Data: Singapore ───────────────────────────────────────────────────────────
+var A_SINGAPORE = [{"id":1, "title":"Desire and Intimacy Exhibition", "cat":"art", "e":"🎨", "loc":"National Gallery Singapore, City Hall", "lat":1.2934, "lng":103.852, "time":"10:00 AM - 7:00 PM", "until":"Ongoing", "price":"S$15", "free":0, "desc":"New exhibition exploring desire and intimacy through contemporary art.", "img":"https://media.timeout.com/images/106396986/image.jpg"}, {"id":2, "title":"IMBA Theatre: Maestro Botero Immersive Experience", "cat":"art", "e":"🎨", "loc":"Gardens by the Bay, Marina Bay", "lat":1.2816, "lng":103.8636, "time":"10:00 AM - 8:00 PM", "until":"Ongoing", "price":"S$38", "free":0, "desc":"World's first immersive experience dedicated to Fernando Botero and his iconic art.", "img":""}, {"id":3, "title":"Temasek Shophouse Thrifty Pop-Up", "cat":"pop-up", "e":"⭐", "loc":"Temasek Shophouse, CBD", "lat":1.2789, "lng":103.8459, "time":"11:00 AM - 9:00 PM", "until":"April 26, 2026", "price":"Free", "free":1, "desc":"Vintage and thrifted fashion pop-up shop with curated sustainable finds.", "img":""}, {"id":4, "title":"South Side Keppel Pet-Friendly Community Market", "cat":"community", "e":"🐾", "loc":"South Side Keppel, Keppel Island", "lat":1.2599, "lng":103.8216, "time":"10:00 AM - 6:00 PM", "until":"April 26, 2026", "price":"Free", "free":1, "desc":"Pet-friendly community market with local vendors and artisan goods.", "img":""}, {"id":5, "title":"SANTAi Café & Music Venue", "cat":"music", "e":"🎵", "loc":"SANTAi, East Coast", "lat":1.3041, "lng":103.9054, "time":"8:00 AM - 11:00 PM", "until":"Ongoing", "price":"Free entry", "free":1, "desc":"Café with live music performances, artisan bakes and specialty coffee.", "img":""}, {"id":6, "title":"DisneyStore.sg Pop-Up Experience", "cat":"pop-up", "e":"⭐", "loc":"Great World City, Clementi", "lat":1.2991, "lng":103.7749, "time":"10:00 AM - 10:00 PM", "until":"April 26, 2026", "price":"Free", "free":1, "desc":"Limited-edition Disney collectibles and exclusive merchandise pop-up showcase.", "img":""}];
+var LABEL_SINGAPORE = "May 2–3, 2026";
+
+// ── Data: Tokyo ───────────────────────────────────────────────────────────────
+var A_TOKYO = [];
+var LABEL_TOKYO = "Apr 25–26, 2026";
+
+// ── Data: Hong Kong ───────────────────────────────────────────────────────────
+var A_HONGKONG = [];
+var LABEL_HONGKONG = "Apr 25–26, 2026";
 
 var COLORS = {
   "art":"#8b5cf6","music":"#3b82f6","pop-up":"#ef4444","film":"#10b981",
@@ -300,10 +308,34 @@ var COLORS = {
   "nightlife":"#a855f7","community":"#f43f5e"
 };
 
+// ── City config ───────────────────────────────────────────────────────────────
+var CITY_CONFIG = {
+  bangkok:   { name:'Bangkok',   lat:13.748,  lng:100.520, zoom:13, source:'Timeout Bangkok'   },
+  singapore: { name:'Singapore', lat:1.290,   lng:103.850, zoom:13, source:'Timeout Singapore' },
+  tokyo:     { name:'Tokyo',     lat:35.682,  lng:139.755, zoom:12, source:'Timeout Tokyo'     },
+  hongkong:  { name:'Hong Kong', lat:22.315,  lng:114.168, zoom:13, source:'Timeout Hong Kong' }
+};
+function getCityData(city) {
+  if (city === 'bangkok')   return A_BANGKOK;
+  if (city === 'singapore') return A_SINGAPORE;
+  if (city === 'tokyo')     return A_TOKYO;
+  if (city === 'hongkong')  return A_HONGKONG;
+  return [];
+}
+function getCityLabel(city) {
+  if (city === 'bangkok')   return LABEL_BANGKOK;
+  if (city === 'singapore') return LABEL_SINGAPORE;
+  if (city === 'tokyo')     return LABEL_TOKYO;
+  if (city === 'hongkong')  return LABEL_HONGKONG;
+  return '';
+}
+var currentCity = 'bangkok';
+var A = getCityData('bangkok');
+
 // ── Map Engine ────────────────────────────────────────────────────────────────
 var TILE = 256;
-var zoom = 13;
-var centerLat = 13.748, centerLng = 100.520;
+var zoom = CITY_CONFIG[currentCity].zoom;
+var centerLat = CITY_CONFIG[currentCity].lat, centerLng = CITY_CONFIG[currentCity].lng;
 
 var wrap = document.getElementById('map-wrap');
 var tileLayer = document.getElementById('tile-layer');
@@ -410,20 +442,23 @@ function render() {
 }
 
 // ── Create markers ────────────────────────────────────────────────────────────
-A.forEach(function(a) {
-  var pin = document.createElement('div');
-  pin.className = 'mpin';
-  pin.id = 'pin-' + a.id;
-  pin.innerHTML =
-    '<div class="mpin-dot" style="background:' + (COLORS[a.cat]||'#888') + '">' + a.e + '</div>' +
-    '<div class="mpin-label">' + a.title + '</div>';
-  pin.addEventListener('click', function(e) {
-    e.stopPropagation();
-    showPopup(a);
-    highlightCard(a.id);
+function buildMarkers() {
+  markerLayer.querySelectorAll('.mpin').forEach(function(p) { p.remove(); });
+  A.forEach(function(a) {
+    var pin = document.createElement('div');
+    pin.className = 'mpin';
+    pin.id = 'pin-' + a.id;
+    pin.innerHTML =
+      '<div class="mpin-dot" style="background:' + (COLORS[a.cat]||'#888') + '">' + a.e + '</div>' +
+      '<div class="mpin-label">' + a.title + '</div>';
+    pin.addEventListener('click', function(e) {
+      e.stopPropagation();
+      showPopup(a);
+      highlightCard(a.id);
+    });
+    markerLayer.appendChild(pin);
   });
-  markerLayer.appendChild(pin);
-});
+}
 
 // ── Popup ─────────────────────────────────────────────────────────────────────
 var popup = document.getElementById('popup');
@@ -663,26 +698,84 @@ wrap.addEventListener('wheel', function(e) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 var sidebar = document.getElementById('sidebar');
 
-A.forEach(function(a) {
-  var el = document.createElement('div');
-  el.className = 'card';
-  el.id = 'card-' + a.id;
-  el.dataset.cat = a.cat;
-  el.innerHTML =
-    '<img class="card-img" src="' + a.img + '" alt="" onerror="this.style.display=\'none\'">' +
-    '<div class="card-body">' +
-      '<span class="ctag tag-' + a.cat + '">' + a.e + ' ' + a.cat + '</span>' +
-      '<div class="card-title">' + a.title + '</div>' +
-      '<div class="card-meta">' +
-        '<span>🕐 ' + a.time + '</span>' +
-        '<span>📍 ' + a.loc + '</span>' +
-        '<span class="' + (a.free ? 'green' : 'amber') + '">💰 ' + a.price + '</span>' +
-        '<span style="color:#4b5563">📅 ' + a.until + '</span>' +
-      '</div>' +
-      '<div class="card-desc">' + a.desc + '</div>' +
-    '</div>';
-  el.addEventListener('click', function() { flyTo(a); });
-  sidebar.appendChild(el);
+function buildSidebar() {
+  sidebar.innerHTML = '';
+  A.forEach(function(a) {
+    var el = document.createElement('div');
+    el.className = 'card';
+    el.id = 'card-' + a.id;
+    el.dataset.cat = a.cat;
+    el.innerHTML =
+      '<img class="card-img" src="' + a.img + '" alt="" onerror="this.style.display=\'none\'">' +
+      '<div class="card-body">' +
+        '<span class="ctag tag-' + a.cat + '">' + a.e + ' ' + a.cat + '</span>' +
+        '<div class="card-title">' + a.title + '</div>' +
+        '<div class="card-meta">' +
+          '<span>🕐 ' + a.time + '</span>' +
+          '<span>📍 ' + a.loc + '</span>' +
+          '<span class="' + (a.free ? 'green' : 'amber') + '">💰 ' + a.price + '</span>' +
+          '<span style="color:#4b5563">📅 ' + a.until + '</span>' +
+        '</div>' +
+        '<div class="card-desc">' + a.desc + '</div>' +
+      '</div>';
+    el.addEventListener('click', function() { flyTo(a); });
+    sidebar.appendChild(el);
+  });
+}
+
+function switchCity(city) {
+  currentCity = city;
+  A = getCityData(city);
+  var cfg = CITY_CONFIG[city];
+
+  // Update map center
+  centerLat = cfg.lat; centerLng = cfg.lng; zoom = cfg.zoom;
+
+  // Update header
+  document.getElementById('city-title').textContent = cfg.name + ' This Weekend';
+  document.getElementById('city-sub').textContent =
+    A.length + ' picks · ' + cfg.source + ' · ' + getCityLabel(city);
+
+  // Update "All N" pill
+  document.querySelector('.pill[data-f="all"]').textContent = 'All ' + A.length;
+
+  // Reset category filter
+  document.querySelectorAll('.pill:not([data-f="bac"])').forEach(function(p) { p.classList.remove('on'); });
+  document.querySelector('.pill[data-f="all"]').classList.add('on');
+
+  // BAC trail: only available on Bangkok
+  var bacPill = document.querySelector('.pill[data-f="bac"]');
+  if (bacPill) {
+    var showBac = city === 'bangkok' && BAC_ACTIVE;
+    bacPill.style.display = showBac ? '' : 'none';
+    if (!showBac && bacVisible) {
+      bacVisible = false;
+      bacPill.classList.remove('on');
+      BAC.forEach(function(b) {
+        var pin = document.getElementById('bpin-' + b.id);
+        if (pin) pin.classList.add('bpin-hidden');
+      });
+    }
+  }
+
+  // Rebuild sidebar and markers, close popup
+  popup.style.display = 'none';
+  buildMarkers();
+  buildSidebar();
+
+  // Reload map tiles
+  loadedTiles = {};
+  tileLayer.innerHTML = '';
+  render();
+}
+
+// City tab click handlers
+document.querySelectorAll('.ctab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.ctab').forEach(function(t) { t.classList.remove('on'); });
+    tab.classList.add('on');
+    switchCity(tab.dataset.city);
+  });
 });
 
 function highlightCard(id) {
@@ -730,7 +823,8 @@ document.querySelectorAll('.pill').forEach(function(pill) {
         tileLayer.innerHTML = '';
       }
     } else {
-      centerLat = 13.748; centerLng = 100.520; zoom = 13;
+      var rcfg = CITY_CONFIG[currentCity];
+      centerLat = rcfg.lat; centerLng = rcfg.lng; zoom = rcfg.zoom;
       loadedTiles = {};
       tileLayer.innerHTML = '';
     }
@@ -739,12 +833,8 @@ document.querySelectorAll('.pill').forEach(function(pill) {
 });
 
 // ── Initial render ────────────────────────────────────────────────────────────
-window.addEventListener('load', function() {
-  render();
-});
-window.addEventListener('resize', function() {
-  render();
-});
+window.addEventListener('resize', function() { render(); });
+switchCity('bangkok');  // bootstrap: builds markers + sidebar + first render
 
 // ── BAC Passport Art Trail ────────────────────────────────────────────────────
 // Active until 31 May 2026; auto-hides after that date.

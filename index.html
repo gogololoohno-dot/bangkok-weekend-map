@@ -467,8 +467,13 @@ var popupTitle = document.getElementById('popup-title');
 var popupMeta = document.getElementById('popup-meta');
 
 function showPopup(a) {
-  popupImg.style.display = '';
-  popupImg.src = a.img;
+  if (a.img) {
+    popupImg.src = a.img;
+    popupImg.style.display = '';
+  } else {
+    popupImg.src = '';
+    popupImg.style.display = 'none';
+  }
   popupTitle.textContent = a.title;
   popupMeta.innerHTML =
     '<span>🕐 ' + a.time + '</span>' +
@@ -834,7 +839,8 @@ document.querySelectorAll('.pill').forEach(function(pill) {
 
 // ── Initial render ────────────────────────────────────────────────────────────
 window.addEventListener('resize', function() { render(); });
-switchCity('bangkok');  // bootstrap: builds markers + sidebar + first render
+// NOTE: switchCity('bangkok') is called AFTER the BAC section below,
+// so that BAC_ACTIVE / BAC / bacVisible are defined before switchCity reads them.
 
 // ── BAC Passport Art Trail ────────────────────────────────────────────────────
 // Active until 31 May 2026; auto-hides after that date.
@@ -955,6 +961,10 @@ if (bacPill) {
     });
   }
 }
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+// Called here (after BAC section) so BAC_ACTIVE / BAC / bacVisible are defined.
+switchCity('bangkok');
 
 </script>
 </body>

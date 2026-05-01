@@ -52,7 +52,9 @@ CITIES = {
         "var":        "A_TOKYO",
         "label_var":  "LABEL_TOKYO",
         "currency":   "¥",
-        "bounds":     (35.50, 35.90, 139.40, 140.00),
+        # Greater Tokyo metro area — Timeout Tokyo includes events in Yokohama,
+        # Saitama, Ome, Hanno, etc. Box covers the full commuting region.
+        "bounds":     (35.30, 35.95, 139.10, 140.10),
     },
     "hongkong": {
         "name":       "Hong Kong",
@@ -80,31 +82,36 @@ def extract_activities(html: str, city_key: str) -> list[dict]:
     print(f"  Asking Claude to parse activities for {city['name']}...")
 
     prompt = f"""You are parsing a Timeout weekend activities article for {city['name']}.
-Extract every activity/event listed. Return ONLY a valid JSON array — no markdown, no explanation.
+Find EVERY event/activity listed in the article — typically 15 to 25 items.
+Do NOT skip events. Do NOT stop early. The article contains many short event blurbs
+each starting with a verb-led headline like "Wander…", "Lose yourself…", "Watch…".
+
+Return ONLY a valid JSON array — no markdown, no explanation, no preamble.
 
 Each item must have exactly these keys:
   id        (integer, 1-based)
-  title     (string, event name)
+  title     (string, short event name — strip the verb-led intro if any)
   cat       (string, exactly one of: art / music / pop-up / film / market / aquarium / nature / nightlife / community)
   e         (string, single emoji matching the category)
-  loc       (string, venue + neighbourhood)
-  lat       (number, GPS latitude for {city['name']})
-  lng       (number, GPS longitude for {city['name']})
+  loc       (string, "Venue, Neighbourhood")
+  lat       (number, GPS latitude for the actual venue in {city['name']})
+  lng       (number, GPS longitude for the actual venue in {city['name']})
   time      (string, opening hours or time)
-  until     (string, end date or "Ongoing")
+  until     (string, end date like "Until May 31" or "Ongoing")
   price     (string, e.g. "Free" or "{city['currency']}300")
   free      (integer, 1 if free entry, else 0)
-  desc      (string, one punchy sentence)
+  desc      (string, one punchy sentence — what makes it worth going)
   img       (string, full image URL from the article, or "" if none found)
 
 Category emoji guide: art=🎨 music=🎵 pop-up=⭐ film=🎬 market=🛍 aquarium=🌊 nature=🌿 nightlife=🌙 community=🐾
 
-IMPORTANT: For lat/lng use your knowledge of real venue locations in {city['name']}.
-Coordinates must be accurate — wrong pins make the map useless.
+CRITICAL — coordinate accuracy:
+For lat/lng use real GPS coordinates of the actual venue. Wrong pins make the map useless.
+If a venue spans multiple locations, use the primary or anchor venue.
 Bounding box for sanity: lat {city['bounds'][0]}–{city['bounds'][1]}, lng {city['bounds'][2]}–{city['bounds'][3]}
 
-HTML content (truncated to first 80 000 chars):
-{html[:80000]}
+HTML content from Timeout (truncated to first 120 000 chars):
+{html[:120000]}
 """
 
     resp = requests.post(
@@ -115,11 +122,12 @@ HTML content (truncated to first 80 000 chars):
             "content-type": "application/json",
         },
         json={
-            "model": "claude-haiku-4-5-20251001",
-            "max_tokens": 6000,
+            # Sonnet, not Haiku — Haiku misses most events on these pages.
+            "model": "claude-sonnet-4-5-20250929",
+            "max_tokens": 12000,
             "messages": [{"role": "user", "content": prompt}],
         },
-        timeout=90,
+        timeout=180,
     )
     resp.raise_for_status()
     raw = resp.json()["content"][0]["text"].strip()

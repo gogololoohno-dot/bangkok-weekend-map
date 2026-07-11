@@ -117,48 +117,84 @@ def fill_missing_images(activities: list[dict], img_map: list[tuple[str, str]]) 
     return filled
 
 
-def extract_activities(html: str, city_key: str) -> list[dict]:
+def fetch_with_jina(url: str) -> str:
+    """Primary: scrape a page via Jina Reader and return clean markdown.
+    Free tier, no API key needed. Jina runs headless browser in the cloud,
+    handles JS rendering and anti-bot protections."""
+    print("  Fetching via Jina Reader...")
+    resp = requests.get(
+        f"https://r.jina.ai/{url}",
+        headers={"Accept": "text/markdown"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    text = resp.text
+    if not text or len(text) < 500:
+        raise RuntimeError(f"Jina returned too little content ({len(text)} chars)")
+    # Jina wraps response in markdown with a header footer. The actual
+    # article content starts after the first `---` or at the "Markdown Content:" line.
+    # Strip the Jina header metadata (Title, URL Source, Published Time markers).
+    for sep in ("\n---\n", "Markdown Content:\n\n"):
+        idx = text.find(sep)
+        if idx != -1:
+            text = text[idx + len(sep):]
+            break
+    text = text.strip()
+    print(f"  → {len(text)} chars of clean markdown")
+    return text
+
+
+def fetch_with_agentcash_firecrawl(url: str) -> str:
+    """Fallback: scrape via AgentCash CLI → Firecrawl x402 endpoint.
+    Uses npx agentcash to handle the x402 payment handshake automatically."""
+    import subprocess
+    import json as _json
+    print("  Fetching via AgentCash + Firecrawl...")
+    body = _json.dumps({"url": url, "formats": ["markdown"], "onlyMainContent": True})
+    result = subprocess.run(
+        ["npx", "agentcash", "fetch", "POST",
+         "https://enrichx402.com/api/firecrawl/scrape",
+         "--body", body],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"AgentCash Firecrawl failed (code={result.returncode}): "
+            f"{result.stderr.strip() or result.stdout.strip()}"
+        )
+    data = _json.loads(result.stdout)
+    markdown = data.get("data", {}).get("markdown", "")
+    if not markdown:
+        raise RuntimeError("AgentCash Firecrawl returned empty markdown")
+    print(f"  → {len(markdown)} chars via AgentCash")
+    return markdown
+
+
+def extract_activities(content: str, city_key: str, source: str = "Timeout") -> list[dict]:
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY environment variable not set.")
     city = CITIES[city_key]
     print(f"  Asking DeepSeek to parse activities for {city['name']}...")
 
-    prompt = f"""You are parsing a Timeout weekend activities article for {city['name']}.
-Find EVERY event/activity listed in the article — typically 15 to 25 items.
-Do NOT skip events. Do NOT stop early. The article contains many short event blurbs
-each starting with a verb-led headline like "Wander…", "Lose yourself…", "Watch…".
+    prompt = f"""Parse {source} weekend activities for {city['name']}.
 
-Return ONLY a valid JSON array — no markdown, no explanation, no preamble.
+Return ONLY a JSON array of ALL events in the article (10-25 items). No markdown, no explanation.
 
-Each item must have exactly these keys:
-  id        (integer, 1-based)
-  title     (string, short event name — strip the verb-led intro if any)
-  cat       (string, exactly one of: art / music / pop-up / film / market / aquarium / nature / nightlife / community)
-  e         (string, single emoji matching the category)
-  loc       (string, "Venue, Neighbourhood")
-  lat       (number, GPS latitude for the actual venue in {city['name']})
-  lng       (number, GPS longitude for the actual venue in {city['name']})
-  time      (string, opening hours or time)
-  until     (string, end date like "Until May 31" or "Ongoing")
-  price     (string, e.g. "Free" or "{city['currency']}300")
-  free      (integer, 1 if free entry, else 0)
-  desc      (string, one punchy sentence — what makes it worth going)
-  img       (string, full image URL from the article, or "" if none found)
+Each item:
+  id (int, 1-based)
+  title (string, short event name)
+  cat (string: art/music/pop-up/film/market/aquarium/nature/nightlife/community)
+  e (string, emoji: 🎨🎵⭐🎬🛍🌊🌿🌙🐾)
+  loc (string, "Venue, Neighbourhood")
+  lat (number), lng (number) — real GPS of venue, within {city['bounds']}
+  time (string), until (string, "Until ..." or "Ongoing"), price (string)
+  free (int, 1 if free else 0)
+  desc (string, one punchy sentence)
+  img (string, image URL or "")
 
-Category emoji guide: art=🎨 music=🎵 pop-up=⭐ film=🎬 market=🛍 aquarium=🌊 nature=🌿 nightlife=🌙 community=🐾
-
-CRITICAL — coordinate accuracy:
-For lat/lng use real GPS coordinates of the actual venue. Wrong pins make the map useless.
-If a venue spans multiple locations, use the primary or anchor venue.
-Bounding box for sanity: lat {city['bounds'][0]}–{city['bounds'][1]}, lng {city['bounds'][2]}–{city['bounds'][3]}
-
-In the HTML below, the actual activity listings usually begin after the hero/nav section.
-Seek past SEO meta, navigation, and hero content — focus on the article body where events are listed.
-Return activities you find. If the HTML doesn't contain full event listings, search beyond the truncation point.
-
-HTML content (truncated to first 150 000 chars):
-{html[:150000]}
+Content:
+{content}
 """
 
     resp = requests.post(
@@ -169,7 +205,7 @@ HTML content (truncated to first 150 000 chars):
         },
         json={
             "model": "deepseek/deepseek-v4-flash",
-            "max_tokens": 12000,
+            "max_tokens": 16384,
             "messages": [{"role": "user", "content": prompt}],
         },
         timeout=180,
@@ -263,6 +299,21 @@ def git_push(label: str) -> None:
     print("  → Pushed to GitHub → Vercel will redeploy automatically")
 
 
+def get_events_for_city(city_key: str, url: str) -> list[dict]:
+    """Hybrid: Jina Reader primary → AgentCash Firecrawl fallback on failure or <5 events."""
+    try:
+        md = fetch_with_jina(url)
+        activities = extract_activities(md, city_key, source="Timeout")
+        if len(activities) >= 5:
+            return activities
+        print(f"  Only {len(activities)} events — too few, trying AgentCash Firecrawl...")
+    except Exception as e:
+        print(f"  Jina failed: {e}")
+        print("  Falling back to AgentCash Firecrawl...")
+    md = fetch_with_agentcash_firecrawl(url)
+    return extract_activities(md, city_key, source="Timeout")
+
+
 def main():
     label = weekend_label()
     print(f"Weekend label: {label}\n")
@@ -272,9 +323,11 @@ def main():
     for i, city_key in enumerate(city_keys):
         print(f"── {CITIES[city_key]['name']} ──────────────────────────")
         try:
+            # Get images from raw HTML (fast HTTP GET, no LLM)
             html = fetch_page(CITIES[city_key]["url"])
-            activities = extract_activities(html, city_key)
             img_map = build_image_map(html)
+            # Get events via hybrid pipeline
+            activities = get_events_for_city(city_key, CITIES[city_key]["url"])
             filled = fill_missing_images(activities, img_map)
             missing = sum(1 for a in activities if not a.get("img"))
             print(f"  → Image fallback: filled {filled}, still missing {missing} (pool: {len(img_map)} alt-tagged images)")

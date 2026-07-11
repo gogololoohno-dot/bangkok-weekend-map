@@ -153,8 +153,8 @@ For lat/lng use real GPS coordinates of the actual venue. Wrong pins make the ma
 If a venue spans multiple locations, use the primary or anchor venue.
 Bounding box for sanity: lat {city['bounds'][0]}–{city['bounds'][1]}, lng {city['bounds'][2]}–{city['bounds'][3]}
 
-HTML content from Timeout (truncated to first 200 000 chars):
-{html[:200000]}
+HTML content from Timeout (truncated to first 80 000 chars):
+{html[:80000]}
 """
 
     resp = requests.post(

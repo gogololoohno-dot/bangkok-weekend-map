@@ -74,12 +74,55 @@ def fetch_page(url: str) -> str:
     return r.text
 
 
+def build_image_map(html: str) -> list[tuple[str, str]]:
+    """Extract (alt_text, image_url) pairs from Timeout's <img> tags. Lazy-load
+    aware (matches both src and data-src). Returns deduped list preserving order."""
+    pattern = r'<img[^>]*(?:src|data-src)="(https://media\.timeout\.com/images/[^"]+)"[^>]*alt="([^"]+)"'
+    seen = set()
+    pairs = []
+    for url, alt in re.findall(pattern, html):
+        alt = alt.strip()
+        if not alt or url in seen:
+            continue
+        seen.add(url)
+        pairs.append((alt, url))
+    return pairs
+
+
+def _tokenize(s: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", s.lower()) if len(w) > 2}
+
+
+def fill_missing_images(activities: list[dict], img_map: list[tuple[str, str]]) -> int:
+    """Fuzzy-match activity titles against alt text to fill blank img fields.
+    Returns the number of entries filled."""
+    filled = 0
+    for a in activities:
+        if a.get("img"):
+            continue
+        title_toks = _tokenize(a.get("title", "")) | _tokenize(a.get("loc", ""))
+        if not title_toks:
+            continue
+        best_score = 0
+        best_url = ""
+        for alt, url in img_map:
+            score = len(title_toks & _tokenize(alt))
+            if score > best_score:
+                best_score = score
+                best_url = url
+        # Require at least 2 overlapping content words to avoid spurious matches.
+        if best_score >= 2:
+            a["img"] = best_url
+            filled += 1
+    return filled
+
+
 def extract_activities(html: str, city_key: str) -> list[dict]:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY environment variable not set.")
+        raise RuntimeError("OPENROUTER_API_KEY environment variable not set.")
     city = CITIES[city_key]
-    print(f"  Asking Claude to parse activities for {city['name']}...")
+    print(f"  Asking DeepSeek to parse activities for {city['name']}...")
 
     prompt = f"""You are parsing a Timeout weekend activities article for {city['name']}.
 Find EVERY event/activity listed in the article — typically 15 to 25 items.
@@ -110,27 +153,25 @@ For lat/lng use real GPS coordinates of the actual venue. Wrong pins make the ma
 If a venue spans multiple locations, use the primary or anchor venue.
 Bounding box for sanity: lat {city['bounds'][0]}–{city['bounds'][1]}, lng {city['bounds'][2]}–{city['bounds'][3]}
 
-HTML content from Timeout (truncated to first 120 000 chars):
-{html[:120000]}
+HTML content from Timeout (truncated to first 200 000 chars):
+{html[:200000]}
 """
 
     resp = requests.post(
-        "https://api.anthropic.com/v1/messages",
+        "https://openrouter.ai/api/v1/chat/completions",
         headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
         },
         json={
-            # Sonnet, not Haiku — Haiku misses most events on these pages.
-            "model": "claude-sonnet-4-5-20250929",
+            "model": "deepseek/deepseek-v4-flash",
             "max_tokens": 12000,
             "messages": [{"role": "user", "content": prompt}],
         },
         timeout=180,
     )
     resp.raise_for_status()
-    raw = resp.json()["content"][0]["text"].strip()
+    raw = resp.json()["choices"][0]["message"]["content"].strip()
 
     # Strip markdown code fences if present
     raw = re.sub(r"^```[a-z]*\n?", "", raw)
@@ -229,6 +270,10 @@ def main():
         try:
             html = fetch_page(CITIES[city_key]["url"])
             activities = extract_activities(html, city_key)
+            img_map = build_image_map(html)
+            filled = fill_missing_images(activities, img_map)
+            missing = sum(1 for a in activities if not a.get("img"))
+            print(f"  → Image fallback: filled {filled}, still missing {missing} (pool: {len(img_map)} alt-tagged images)")
             audit_coordinates(city_key, activities)
             update_html_city(city_key, activities, label)
         except Exception as e:

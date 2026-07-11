@@ -153,8 +153,12 @@ For lat/lng use real GPS coordinates of the actual venue. Wrong pins make the ma
 If a venue spans multiple locations, use the primary or anchor venue.
 Bounding box for sanity: lat {city['bounds'][0]}–{city['bounds'][1]}, lng {city['bounds'][2]}–{city['bounds'][3]}
 
-HTML content from Timeout (truncated to first 80 000 chars):
-{html[:80000]}
+In the HTML below, the actual activity listings usually begin after the hero/nav section.
+Seek past SEO meta, navigation, and hero content — focus on the article body where events are listed.
+Return activities you find. If the HTML doesn't contain full event listings, search beyond the truncation point.
+
+HTML content (truncated to first 150 000 chars):
+{html[:150000]}
 """
 
     resp = requests.post(

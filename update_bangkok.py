@@ -251,8 +251,13 @@ def audit_coordinates(city_key: str, activities: list[dict]) -> None:
 
 def weekend_label() -> str:
     today = datetime.now()
-    days_ahead = (5 - today.weekday()) % 7 or 7
-    saturday = today + timedelta(days=days_ahead)
+    weekday = today.weekday()  # Mon=0 ... Sun=6, Sat=5
+    # Days to the Saturday of THIS weekend
+    if weekday <= 5:  # Mon–Sat: Saturday is ahead or today
+        days_to_saturday = 5 - weekday
+    else:  # Sunday: Saturday was yesterday
+        days_to_saturday = -1
+    saturday = today + timedelta(days=days_to_saturday)
     sunday = saturday + timedelta(days=1)
     return f"{saturday.strftime('%b')} {saturday.day}–{sunday.day}, {sunday.year}"
 

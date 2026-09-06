@@ -9,11 +9,27 @@ import re
 import json
 import sys
 import os
+import atexit
+import time
 import requests
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# Flush every line. When the task is killed mid-run (laptop re-entering Modern
+# Standby), block-buffered output is discarded and the log shows nothing.
+sys.stdout.reconfigure(line_buffering=True)
+
 HTML_FILE = Path(__file__).parent / "index.html"
+LOG_FILE = Path(__file__).parent / "update_bangkok.log"
+
+
+def start_logging() -> None:
+    """Own the log file rather than relying on a cmd '>>' redirect. An orphaned
+    child of a killed run keeps that redirect's handle and makes every later run
+    die instantly with no output — a wedge that is invisible in the log."""
+    log = open(LOG_FILE, "a", encoding="utf-8", buffering=1)
+    sys.stdout = log
+    sys.stderr = log
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
@@ -148,14 +164,22 @@ def fetch_with_agentcash_firecrawl(url: str) -> str:
     """Fallback: scrape via AgentCash CLI → Firecrawl x402 endpoint.
     Uses npx agentcash to handle the x402 payment handshake automatically."""
     import subprocess
+    import shutil
     import json as _json
     print("  Fetching via AgentCash + Firecrawl...")
     body = _json.dumps({"url": url, "formats": ["markdown"], "onlyMainContent": True})
+    # Windows ships npx as npx.CMD, which CreateProcess won't resolve from a bare
+    # name — without this the fallback dies with WinError 2 and never runs.
+    npx = shutil.which("npx")
+    if not npx:
+        raise RuntimeError("npx not found on PATH — cannot use AgentCash fallback")
     result = subprocess.run(
-        ["npx", "agentcash", "fetch", "POST",
+        [npx, "--yes", "agentcash", "fetch", "POST",
          "https://enrichx402.com/api/firecrawl/scrape",
          "--body", body],
         capture_output=True, text=True, timeout=60,
+        # --yes and no stdin: otherwise npx blocks forever on its install prompt.
+        stdin=subprocess.DEVNULL,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -197,27 +221,41 @@ Content:
 {content}
 """
 
-    resp = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": "deepseek/deepseek-v4-flash",
-            "max_tokens": 16384,
-            "messages": [{"role": "user", "content": prompt}],
-        },
-        timeout=180,
-    )
-    resp.raise_for_status()
-    raw = resp.json()["choices"][0]["message"]["content"].strip()
+    # The model intermittently returns null content or malformed JSON. Retrying
+    # the same clean markdown succeeds far more often than the scraper fallback.
+    for attempt in range(1, 4):
+        try:
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "deepseek/deepseek-v4-flash",
+                    "max_tokens": 16384,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=180,
+            )
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"].get("content")
+            if not content:
+                raise ValueError("model returned empty content")
 
-    # Strip markdown code fences if present
-    raw = re.sub(r"^```[a-z]*\n?", "", raw)
-    raw = re.sub(r"\n?```$", "", raw)
+            # Strip markdown code fences if present
+            raw = re.sub(r"^```[a-z]*\n?", "", content.strip())
+            raw = re.sub(r"\n?```$", "", raw)
 
-    activities = json.loads(raw)
+            # strict=False: the model sometimes emits raw newlines/tabs inside
+            # string values, which the default parser rejects outright.
+            activities = json.loads(raw, strict=False)
+            break
+        except (requests.RequestException, ValueError) as e:
+            print(f"  attempt {attempt}/3 failed: {e}")
+            if attempt == 3:
+                raise RuntimeError(f"OpenRouter failed after 3 attempts: {e}") from e
+            time.sleep(5)
 
     # Sanitise
     for i, a in enumerate(activities, 1):
@@ -262,6 +300,28 @@ def weekend_label() -> str:
     return f"{saturday.strftime('%b')} {saturday.day}–{sunday.day}, {sunday.year}"
 
 
+def already_current(label: str) -> bool:
+    """True if every city already carries this weekend's label, so a catch-up
+    trigger can exit immediately instead of redoing the work."""
+    html = HTML_FILE.read_text(encoding="utf-8")
+    return all(f'var {c["label_var"]} = "{label}";' in html for c in CITIES.values())
+
+
+def keep_awake() -> None:
+    """Hold a power request so Windows can't sleep mid-run. A Modern Standby
+    laptop killed the 2026-09-04 run 40 seconds in."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+    ES_CONTINUOUS, ES_SYSTEM_REQUIRED, ES_AWAYMODE_REQUIRED = 0x80000000, 0x1, 0x40
+    ctypes.windll.kernel32.SetThreadExecutionState(
+        ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED
+    )
+    atexit.register(
+        lambda: ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+    )
+
+
 def update_html_city(city_key: str, activities: list[dict], label: str) -> None:
     """Replace one city's data array and label variable in index.html."""
     city = CITIES[city_key]
@@ -288,19 +348,37 @@ def update_html_city(city_key: str, activities: list[dict], label: str) -> None:
     print(f"  → {city_key} updated in HTML ({len(activities)} activities, {label})")
 
 
+def git_synced() -> bool:
+    """True if index.html is committed and pushed. A run killed between writing
+    the file and pushing leaves the live site stale while the file looks current."""
+    import subprocess
+    repo = HTML_FILE.parent
+    dirty = subprocess.run(["git", "status", "--porcelain", "index.html"],
+                           cwd=repo, capture_output=True, text=True).stdout.strip()
+    ahead = subprocess.run(["git", "rev-list", "@{u}..HEAD"],
+                           cwd=repo, capture_output=True, text=True).stdout.strip()
+    return not dirty and not ahead
+
+
 def git_push(label: str) -> None:
     import subprocess
     repo = HTML_FILE.parent
-    cmds = [
-        ["git", "add", "index.html"],
+    subprocess.run(["git", "add", "index.html"], cwd=repo, check=True)
+
+    commit = subprocess.run(
         ["git", "commit", "-m", f"Auto-update: weekend picks {label} (all cities)"],
-        ["git", "push"],
-    ]
-    for cmd in cmds:
-        result = subprocess.run(cmd, cwd=repo, capture_output=True, text=True)
-        print(result.stdout.strip() or result.stderr.strip())
-        if result.returncode != 0:
-            raise RuntimeError(f"Git command failed: {' '.join(cmd)}\n{result.stderr}")
+        cwd=repo, capture_output=True, text=True,
+    )
+    output = commit.stdout + commit.stderr
+    # An already-committed-but-unpushed run must still reach the push below.
+    if commit.returncode != 0 and "nothing to commit" not in output:
+        raise RuntimeError(f"git commit failed:\n{output}")
+    print(commit.stdout.strip() or "  (nothing new to commit)")
+
+    push = subprocess.run(["git", "push"], cwd=repo, capture_output=True, text=True)
+    if push.returncode != 0:
+        raise RuntimeError(f"git push failed:\n{push.stdout}{push.stderr}")
+    print(push.stdout.strip() or push.stderr.strip())
     print("  → Pushed to GitHub → Vercel will redeploy automatically")
 
 
@@ -321,7 +399,17 @@ def get_events_for_city(city_key: str, url: str) -> list[dict]:
 
 def main():
     label = weekend_label()
-    print(f"Weekend label: {label}\n")
+    print(f"\n=== Run {datetime.now():%Y-%m-%d %H:%M} — weekend label: {label} ===")
+
+    if already_current(label):
+        if git_synced():
+            print("index.html already has this weekend's picks — nothing to do.")
+            return
+        print("Picks are current but never reached GitHub — pushing now.")
+        git_push(label)
+        return
+
+    keep_awake()
 
     failed = []
     city_keys = list(CITIES.keys())
@@ -360,4 +448,6 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--log" in sys.argv:
+        start_logging()
     main()

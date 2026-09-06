@@ -281,7 +281,7 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
       </div>
     </div>
 
-    <div id="attr"><a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap</a></div>
+    <div id="attr"><a href="https://www.esri.com/en-us/legal/terms/full-master-agreement" target="_blank">Powered by Esri</a></div>
   </div>
 </div>
 
@@ -396,11 +396,10 @@ function renderTiles() {
       var img = document.createElement('img');
       img.style.left = px + 'px';
       img.style.top  = py + 'px';
-      // Round-robin subdomain a/b/c
-      var sub = ['a','b','c'][(info.wtx + info.wty) % 3];
-      // CartoDB Voyager — English labels, Google Maps-like colours, reliable
-      var sub = ['a','b','c','d'][(info.wtx + info.wty) % 4];
-      img.src = 'https://' + sub + '.basemaps.cartocdn.com/rastertiles/voyager/' + zoom + '/' + info.wtx + '/' + info.wty + '.png';
+      // Esri World Street Map — Thai/English labels, no API key. Carto's free
+      // basemaps now bake an "API KEY REQUIRED" watermark into every tile.
+      // Note Esri orders the path z/y/x, not z/x/y.
+      img.src = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/' + zoom + '/' + info.wty + '/' + info.wtx;
       img.onerror = function() { this.style.background = '#1a2035'; };
       tileLayer.appendChild(img);
       loadedTiles[key] = img;

@@ -216,28 +216,31 @@ Single self-contained HTML reading `data.json`. Inline SVG, no chart library, co
 `inference-capital-markets-map.html`. Served locally via a `launch.json` entry, matching the
 existing `oil-dashboard` pattern.
 
-Five ranked bar charts in the style of OpenRouter's leaderboard, linear scale. Each row is
-one player: rank, colour swatch, bar proportional to the leader, value, share of the
-chart's total, 7-day momentum, and the number of days the player reports in range.
-Player = colour, consistent across every chart; the tile strip doubles as show/hide.
+Five **stacked bar charts over time**, in the style of OpenRouter's "Top Models" chart:
+x-axis is time, each bar is one period, each segment within the bar is one player, linear
+scale. The biggest player over the range sits at the bottom of every stack. A breakdown
+panel beside each chart lists every player's value for the hovered bar, sorted, plus the
+total; it defaults to the most recent bar. Hovering dims every other bar.
 
-1. **Requests/day** — Chutes, AntSeed, Surplus, Engy, gm, BlockRun
-2. **Tokens/day** — Chutes, AntSeed, Surplus, Engy
-3. **Buyer spend/day** — Chutes USD, AntSeed GMV, gm value
-4. **Protocol capture/day** — AntSeed fees, Engy emissions
-5. **Tokens per request** — Chutes, AntSeed, Surplus, Engy (the four with both inputs);
-   Σ tokens ÷ Σ requests over the range, so it is a weighted ratio, not a mean of daily
-   ratios. Not additive, so no share column.
+Period = one day for the 30d / 90d ranges and one ISO week for "All". The final week on
+"All" is usually partial; it is hatched and the panel says how many of its 7 days are in.
 
-**Ranking value is the per-day average over the days each player reports in range, not a
-period sum.** OpenRouter sums because every model covers its whole period; here Chutes has
-587 days and Surplus 28, so a sum on "All" would be a coverage contest rather than a size
-comparison. The days column makes unequal coverage visible instead of hiding it.
+1. **Requests** — Chutes, AntSeed, Surplus, Engy, gm, BlockRun
+2. **Tokens** — Chutes, AntSeed, Surplus, Engy
+3. **Buyer spend** — Chutes USD, AntSeed GMV, gm value
+4. **Protocol capture** — AntSeed fees, Engy emissions
+5. **Tokens per request** — Chutes, AntSeed, Surplus, Engy; Σ tokens ÷ Σ requests per
+   period. Not additive, so this chart is **grouped** (one thin bar per player per period)
+   rather than stacked, and has no total row.
 
-The first version used log-scale line charts on a shared time axis. Log preserved the small
-players but made magnitude unreadable — you could not see who was bigger or by how much,
-which is the primary question. Ranked linear bars answer it directly; trend is carried by
-the 7-day momentum column and the tile strip rather than by a line.
+Unequal coverage is honest by construction here: a player that only reports 28 days simply
+has no segment in earlier bars. Nothing is averaged or extrapolated.
+
+Two earlier designs were rejected. Log-scale lines on a shared time axis preserved the small
+players but made magnitude unreadable — you could not see who was bigger or by how much.
+A ranked leaderboard table (per-day averages) showed size but lost the time dimension
+entirely. Stacked bars show both: the height is the market, the segments are the shares,
+and the sequence is the trend.
 
 Charts 3 and 4 are split deliberately. "Revenue" means four different things across this
 roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), traffic value served (gm), and token emissions that are not buyer
@@ -246,12 +249,12 @@ chart on the page. Buyer spend vs protocol capture is the honest cut, and the ga
 two is itself the interesting quantity.
 
 Supporting UI:
-- Range selector: 7d / 30d / 90d / All — sets the averaging window
+- Range selector: 30d / 90d (daily bars) / All (weekly bars)
 - Header strip: per player, latest value, 7-day change, and **data-through timestamp**, so a
   dead scraper reads as dead rather than as a plateau
 - Absent players render as greyed legend entries with the reason on hover — never as zero,
   never silently dropped
-- Scraped sources badged distinctly from API sources; snapshot bars (BlockRun) hatched
+- Scraped sources badged distinctly from API sources on the tiles
 
 Scheduled daily ~08:10 UTC (after Surplus generates ~08:01 UTC and Engy's hourly rollup lands),
 plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the existing

@@ -31,21 +31,25 @@
   .tile .meta { font-size:10px; color:var(--gray); margin-top:4px; letter-spacing:.06em; text-transform:uppercase; }
   .up { color:#087f3f; } .dn { color:#c1121f; }
 
-  .charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(560px,1fr)); gap:28px 40px; }
+  .chart { margin-bottom:40px; }
   .chart h2 { font-family:'Anton'; font-size:20px; text-transform:uppercase; letter-spacing:.02em; }
-  .chart .note { font-size:11px; color:var(--gray); margin:2px 0 12px; min-height:28px; }
-  .chart .absent { font-size:10px; color:var(--gray); letter-spacing:.08em; text-transform:uppercase; margin-top:8px; }
-  .hdr, .row { display:grid; grid-template-columns:22px 150px 1fr 84px 52px 62px 44px; gap:10px; align-items:center; }
-  .hdr { font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--gray); padding-bottom:6px; border-bottom:1px solid var(--line); margin-bottom:6px; }
-  .row { padding:5px 0; font-size:12px; }
-  .row .rk { font-family:'Anton'; font-size:14px; color:var(--gray); }
-  .row .lbl { display:flex; align-items:center; gap:8px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .row .bar { height:18px; background:var(--grid); position:relative; }
-  .row .bar .fill { position:absolute; inset:0 auto 0 0; }
-  .row .bar .fill.snapshot { background-image:repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,.45) 4px 7px); }
-  .row .val { font-family:'Anton'; font-size:15px; text-align:right; }
-  .row .share, .row .chg, .row .cov { text-align:right; font-size:11px; }
-  .row .share, .row .cov { color:var(--gray); }
+  .chart .note { font-size:11px; color:var(--gray); margin:2px 0 10px; }
+  .chart .absent { font-size:10px; color:var(--gray); letter-spacing:.08em; text-transform:uppercase; margin-top:6px; }
+  .body { display:grid; grid-template-columns:1fr 250px; gap:20px; align-items:start; }
+  svg { width:100%; height:300px; display:block; overflow:visible; }
+  .gridline { stroke:var(--grid); stroke-width:1; }
+  .axis { font-size:10px; fill:var(--gray); font-family:'Archivo'; }
+  .seg { transition:opacity .08s; }
+  .dim .seg { opacity:.3; }
+  .dim .seg.hot { opacity:1; }
+  .panel { border:1.5px solid var(--ink); padding:12px 14px; font-size:12px; }
+  .panel .when { font-family:'Anton'; font-size:15px; letter-spacing:.03em; margin-bottom:8px; }
+  .panel .when small { font-family:'Archivo'; font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--gray); margin-left:6px; }
+  .panel .pr { display:flex; align-items:center; gap:8px; padding:3px 0; }
+  .panel .pr .lbl { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .panel .pr .v { font-family:'Anton'; font-size:14px; }
+  .panel .tot { border-top:1px solid var(--line); margin-top:6px; padding-top:6px; font-weight:700; }
+  .panel .tot .v { font-size:16px; }
 </style>
 </head>
 <body>
@@ -57,34 +61,35 @@
     </div>
     <div class="spacer"></div>
     <div class="ranges" id="ranges">
-      <button class="tbtn" data-days="7">7d</button>
-      <button class="tbtn on" data-days="30">30d</button>
-      <button class="tbtn" data-days="90">90d</button>
-      <button class="tbtn" data-days="0">All</button>
+      <button class="tbtn" data-days="30">30d</button>
+      <button class="tbtn on" data-days="90">90d</button>
+      <button class="tbtn" data-days="0">All · weekly</button>
     </div>
   </header>
   <div class="strip" id="strip"></div>
-  <div class="charts" id="charts"></div>
+  <div id="charts"></div>
 </div>
 
 <script>
 const COLORS = { chutes:'#111111', antseed:'#c1121f', surplus:'#1d4ed8', engy:'#e08a00',
                  gm:'#059669', blockrun:'#db2777' };
-const SNAPSHOT = new Set(['blockrun']);     // hatched: rolling-24h figures, not calendar days
 const CHARTS = [
-  { key:'requests', title:'Requests / day', money:false,
-    note:'Average per day over the days each player reports in range. BlockRun is a rolling 24h snapshot (hatched).' },
-  { key:'tokens', title:'Tokens / day', money:false,
+  { key:'requests', title:'Requests', money:false,
+    note:'Stacked per period. Chutes, AntSeed, Surplus, Engy: calendar-day totals. gm: epoch rollup. BlockRun: rolling 24h snapshot.' },
+  { key:'tokens', title:'Tokens', money:false,
     note:'Input + output (+ cache where reported). Surplus cache tokens are prompt tokens served from cache.' },
-  { key:'spend', title:'Buyer spend / day (USD)', money:true,
+  { key:'spend', title:'Buyer spend (USD)', money:true,
     note:'What demand paid. Chutes: buyer USD. AntSeed: settlement GMV. gm: traffic value served.' },
-  { key:'capture', title:'Protocol capture / day (USD)', money:true,
+  { key:'capture', title:'Protocol capture (USD)', money:true,
     note:'What the network kept. AntSeed: fees. Engy: SN53 miner emissions — issuance, not buyer money.' },
-  { key:'tokens_per_request', title:'Tokens per request', money:false, ratio:true,
-    note:'Σ tokens ÷ Σ requests over the range. Workload shape — separates chat routers from long-context / agent traffic. Not additive, so no share.' },
+  { key:'tokens_per_request', title:'Tokens per request', money:false, grouped:true,
+    note:'Σ tokens ÷ Σ requests per period, one bar per player (not additive, so not stacked). Workload shape.' },
 ];
+const M = { t:12, r:8, b:26, l:58 };
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-let DATA, days = 30, hidden = new Set();
+let DATA, days = 90, hidden = new Set();
+const weekly = () => days === 0;
 
 const fmt = (v) => {
   if (v == null || !isFinite(v)) return '—';
@@ -97,16 +102,25 @@ const fmt = (v) => {
 };
 const usd = (v) => v == null ? '—' : '$' + fmt(v);
 const pct = (v) => v == null ? '' : `<span class="${v>=0?'up':'dn'}">${v>=0?'+':''}${v.toFixed(0)}%</span>`;
+const dshort = (day) => { const d = new Date(day+'T00:00:00Z'); return `${MON[d.getUTCMonth()]} ${d.getUTCDate()}`; };
+const dlong = (day) => { const d = new Date(day+'T00:00:00Z'); return `${MON[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`; };
+const addDays = (day, n) => { const d = new Date(day+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
 
 function cutoff() {
   if (!days) return '';
   const c = new Date(); c.setUTCDate(c.getUTCDate() - days);
   return c.toISOString().slice(0,10);
 }
-const inRange = (series) => series.filter(([d]) => d >= cutoff());
-const sum = (series) => series.reduce((a, [,v]) => a + v, 0);
+// Bucket key: the day itself, or the Monday of its ISO week.
+function bucketOf(day) {
+  if (!weekly()) return day;
+  const d = new Date(day+'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+  return d.toISOString().slice(0,10);
+}
+const bucketLabel = (k) => weekly() ? `${dshort(k)} – ${dshort(addDays(k,6))}` : dlong(k);
 
-// 7-day momentum: mean of the last 7 points vs the 7 before, over the player's full series
+const sum = (series) => series.reduce((a, [,v]) => a + v, 0);
 function momentum(series) {
   if (series.length < 14) return null;
   const a = sum(series.slice(-7)) / 7, b = sum(series.slice(-14, -7)) / 7;
@@ -138,58 +152,85 @@ function renderStrip() {
   }
 }
 
-// One ranked row per player: value = per-day average over the days it reports in range.
-function rankRows(cfg) {
-  const data = DATA.charts[cfg.key] || {};
-  const rows = [];
-  for (const p of Object.keys(DATA.players)) {
-    if (hidden.has(p)) continue;
-    let value, cov;
-    if (cfg.ratio) {
-      const t = inRange(DATA.charts.tokens[p] || []), r = inRange(DATA.charts.requests[p] || []);
-      const rd = new Map(r); const paired = t.filter(([d]) => rd.has(d));
-      cov = paired.length;
-      value = cov ? sum(paired) / sum(paired.map(([d]) => [d, rd.get(d)])) : null;
+// -> { keys:[bucket...], val:{bucket:{player:v}}, ndays:{bucket:Set(day)}, players:[stack order] }
+function buckets(cfg) {
+  const cut = cutoff();
+  const players = Object.keys(DATA.players).filter(p => !hidden.has(p));
+  const val = {}, ndays = {}, tok = {}, req = {};
+  const add = (store, b, p, v) => { (store[b] ||= {})[p] = (store[b][p] || 0) + v; };
+  for (const p of players) {
+    if (cfg.grouped) {
+      for (const [d, v] of DATA.charts.tokens[p] || []) if (d >= cut) { add(tok, bucketOf(d), p, v); (ndays[bucketOf(d)] ||= new Set()).add(d); }
+      for (const [d, v] of DATA.charts.requests[p] || []) if (d >= cut) add(req, bucketOf(d), p, v);
     } else {
-      const s = inRange(data[p] || []);
-      cov = s.length;
-      value = cov ? sum(s) / cov : null;
+      for (const [d, v] of DATA.charts[cfg.key][p] || []) if (d >= cut) { add(val, bucketOf(d), p, v); (ndays[bucketOf(d)] ||= new Set()).add(d); }
     }
-    if (value == null) continue;
-    rows.push({ p, value, cov, chg: momentum(data[p] || []) });
   }
-  rows.sort((a, b) => b.value - a.value);
-  return rows;
+  if (cfg.grouped) for (const b of Object.keys(tok)) for (const p of Object.keys(tok[b])) if (req[b]?.[p]) add(val, b, p, tok[b][p] / req[b][p]);
+  const keys = Object.keys(val).sort();
+  const totals = {}; for (const b of keys) for (const [p, v] of Object.entries(val[b])) totals[p] = (totals[p] || 0) + v;
+  const order = players.filter(p => totals[p]).sort((a, b) => totals[b] - totals[a]);   // biggest at the bottom
+  return { keys, val, ndays, players: order };
 }
 
 function renderChart(cfg) {
   const box = document.createElement('div'); box.className = 'chart';
-  const rows = rankRows(cfg);
-  const present = new Set(rows.map(r => r.p));
-  const absent = Object.keys(DATA.players).filter(p => !present.has(p) && !hidden.has(p));
+  const B = buckets(cfg);
+  const absent = Object.keys(DATA.players).filter(p => !hidden.has(p) && !B.players.includes(p));
   const f = cfg.money ? usd : fmt;
-  const max = rows.length ? rows[0].value : 1;
-  const total = cfg.ratio ? null : rows.reduce((a, r) => a + r.value, 0);
+  box.innerHTML = `<h2>${cfg.title}</h2><div class="note">${cfg.note}</div>`;
+  if (!B.keys.length) { box.innerHTML += '<div class="absent">no data in range</div>'; return box; }
 
-  let html = `<h2>${cfg.title}</h2><div class="note">${cfg.note}</div>`;
-  if (!rows.length) html += '<div class="absent">no data in range</div>';
-  else {
-    html += `<div class="hdr"><span>#</span><span>player</span><span></span><span>avg/day</span><span>share</span><span>7d</span><span>days</span></div>`;
-    rows.forEach((r, i) => {
-      const w = Math.max(1.5, r.value / max * 100);
-      html += `<div class="row">
-        <div class="rk">${i+1}</div>
-        <div class="lbl"><span class="sw" style="background:${COLORS[r.p]}"></span>${DATA.players[r.p].label}</div>
-        <div class="bar"><div class="fill${SNAPSHOT.has(r.p)?' snapshot':''}" style="width:${w}%;background:${COLORS[r.p]}"></div></div>
-        <div class="val">${f(r.value)}</div>
-        <div class="share">${total ? (r.value/total*100).toFixed(0)+'%' : '—'}</div>
-        <div class="chg">${pct(r.chg)}</div>
-        <div class="cov">${r.cov}d</div>
-      </div>`;
-    });
-  }
-  if (absent.length) html += `<div class="absent">not reported: ${absent.map(p => DATA.players[p].label).join(' · ')}</div>`;
-  box.innerHTML = html;
+  const W = 1200, H = 300, iw = W - M.l - M.r, ih = H - M.t - M.b;
+  const n = B.keys.length, slot = iw / n, bw = Math.max(1, slot * (weekly() ? 0.78 : 0.72));
+  const top = Math.max(...B.keys.map(b => cfg.grouped
+    ? Math.max(...Object.values(B.val[b]))
+    : Object.values(B.val[b]).reduce((a, v) => a + v, 0))) * 1.05 || 1;
+  const y = (v) => M.t + ih - v / top * ih;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <defs><pattern id="hatch-${cfg.key}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#fff" opacity="0"/><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-width="3" opacity=".55"/></pattern></defs>`;
+  for (let i = 0; i <= 4; i++) { const v = top * i / 4;
+    svg += `<line class="gridline" x1="${M.l}" x2="${W-M.r}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${M.l-6}" y="${y(v)+3}" text-anchor="end">${f(v)}</text>`; }
+  const step = Math.max(1, Math.ceil(n / 9));
+  B.keys.forEach((b, i) => {
+    const x0 = M.l + i * slot + (slot - bw) / 2;
+    if (i % step === 0) svg += `<text class="axis" x="${x0 + bw/2}" y="${H-8}" text-anchor="middle">${dshort(b)}</text>`;
+    const partial = weekly() && i === n-1 && B.ndays[b].size < 7;
+    if (cfg.grouped) {
+      const ps = B.players.filter(p => B.val[b][p] != null), gw = bw / Math.max(1, ps.length);
+      ps.forEach((p, j) => { const v = B.val[b][p];
+        svg += `<rect class="seg" data-i="${i}" x="${x0 + j*gw}" y="${y(v)}" width="${Math.max(0.5, gw-1)}" height="${ih - (y(v)-M.t)}" fill="${COLORS[p]}"/>`; });
+    } else {
+      let acc = 0;
+      for (const p of B.players) { const v = B.val[b][p]; if (!v) continue;
+        svg += `<rect class="seg" data-i="${i}" x="${x0}" y="${y(acc+v)}" width="${bw}" height="${y(acc)-y(acc+v)}" fill="${COLORS[p]}"/>`; acc += v; }
+      if (partial) svg += `<rect data-i="${i}" x="${x0}" y="${y(acc)}" width="${bw}" height="${ih-(y(acc)-M.t)}" fill="url(#hatch-${cfg.key})" pointer-events="none"/>`;
+    }
+    svg += `<rect data-hit="${i}" x="${M.l + i*slot}" y="${M.t}" width="${slot}" height="${ih}" fill="transparent"/>`;
+  });
+  svg += '</svg>';
+
+  const body = document.createElement('div'); body.className = 'body';
+  body.innerHTML = svg + '<div class="panel"></div>';
+  box.appendChild(body);
+  if (absent.length) box.innerHTML += `<div class="absent">not reported: ${absent.map(p => DATA.players[p].label).join(' · ')}</div>`;
+
+  const svgEl = box.querySelector('svg'), panel = box.querySelector('.panel');
+  const show = (i) => {
+    const b = B.keys[i], rows = B.players.map(p => [p, B.val[b][p]]).filter(([,v]) => v != null).sort((a, c) => c[1] - a[1]);
+    const partial = weekly() && i === n-1 && B.ndays[b].size < 7;
+    let h = `<div class="when">${bucketLabel(b)}${partial ? `<small>${B.ndays[b].size} of 7 days</small>` : ''}</div>`;
+    for (const [p, v] of rows) h += `<div class="pr"><span class="sw" style="background:${COLORS[p]}"></span><span class="lbl">${DATA.players[p].label}</span><span class="v">${f(v)}</span></div>`;
+    if (!cfg.grouped) h += `<div class="pr tot"><span class="lbl">Total</span><span class="v">${f(rows.reduce((a, [,v]) => a + v, 0))}</span></div>`;
+    panel.innerHTML = h;
+    svgEl.classList.toggle('dim', i !== n-1 || svgEl.matches(':hover'));
+    svgEl.querySelectorAll('.seg').forEach(s => s.classList.toggle('hot', +s.dataset.i === i));
+  };
+  svgEl.addEventListener('mousemove', (e) => { const t = e.target.closest('[data-hit],[data-i]'); if (t) show(+(t.dataset.hit ?? t.dataset.i)); });
+  svgEl.addEventListener('mouseleave', () => { svgEl.classList.remove('dim'); show(n-1); });
+  show(n-1); svgEl.classList.remove('dim');
   return box;
 }
 
@@ -208,7 +249,7 @@ document.getElementById('ranges').onclick = (e) => {
 
 fetch('data.json').then(r => r.json()).then(d => {
   DATA = d;
-  document.getElementById('gen').textContent = `generated ${d.generated_at.replace('T',' ').slice(0,16)} UTC · ${Object.keys(d.players).length} players · ranked by per-day average in range · click a tile to toggle`;
+  document.getElementById('gen').textContent = `generated ${d.generated_at.replace('T',' ').slice(0,16)} UTC · ${Object.keys(d.players).length} players · hover a bar for the breakdown · click a tile to toggle`;
   render();
 }).catch(err => { document.getElementById('gen').textContent = 'data.json missing — run scrape.py then build.py'; console.error(err); });
 </script>

@@ -1,6 +1,6 @@
 # Onchain Inference Dashboard
 
-Daily scraper + single-file dashboard tracking 6 onchain inference players.
+Daily scraper + single-file dashboard tracking 5 onchain inference players.
 Design: `../docs/superpowers/specs/2026-09-08-onchain-inference-dashboard-design.md`
 
 ## Run
@@ -27,7 +27,6 @@ least one source failed — check the log before trusting that day.
 | surplus | scrape | requests, tokens_in/out/cache |
 | engy | scrape + api | requests, tokens; capture_emissions (taostats key from `../inference-farm/.env`) |
 | gm | scrape | requests, spend_usd (epoch rollup; needs two scrapes to emit a day) |
-| blockrun | api | requests, settlements (rolling 24h, previous UTC day) |
 
 Scraped sources parse undocumented Next.js payloads. When one breaks, its adapter raises,
 the run exits 1, and the other sources still commit. Fix the regex, refresh the fixture,

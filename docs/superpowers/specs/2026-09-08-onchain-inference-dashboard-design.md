@@ -12,7 +12,7 @@ are actually doing.
 
 ## Roster and coverage
 
-Six players. No player covers every metric, and the gaps are load-bearing
+Five players. No player covers every metric, and the gaps are load-bearing
 information — they are rendered, not hidden.
 
 | Player | req/day | tok/day | buyer spend | protocol capture | History at build time | Access |
@@ -22,12 +22,13 @@ information — they are rendered, not hidden.
 | Surplus | yes | yes | — | — | 28 days rolling | HTML scrape |
 | Engy (SN53) | yes | yes | — | yes (emissions) | 31 days rolling | HTML scrape + taostats |
 | gm (SN28) | yes | — | yes | — | none — forward only | HTML scrape |
-| BlockRun | yes | — | — | — | none — forward only | public REST |
 
-Removed after the first build: Venice. venicestats.com is a third-party token tracker, not
-a Venice dashboard — Venice itself discloses no usage or revenue. The only onchain series
-is the fixed burn per purchase (~$5), which measures neither demand nor capture in a way
-comparable to the others. Dropped on 2026-09-08.
+Removed after the first build (2026-09-08):
+- **Venice.** venicestats.com is a third-party token tracker, not a Venice dashboard — Venice
+  itself discloses no usage or revenue. The only onchain series is the fixed burn per
+  purchase (~$5), which measures neither demand nor capture comparably.
+- **BlockRun.** Exposes a single rolling-24h number with no history; at ~900 calls/day it
+  would take months of snapshots to show anything, and even then not calendar days.
 
 Rejected after checking: Targon (hardware sales page, no usage stats), Nineteen (403),
 inference.net, Dolphin, UsePod, OpenVecta, DGrid, SolRouter, Actual, Instant, Verathos,
@@ -41,7 +42,7 @@ onchain-inference-dashboard/
   scrape.py           # entrypoint — fetch all sources, upsert
   sources/
     __init__.py       # SOURCES registry
-    chutes.py  blockrun.py                 # kind="api"
+    chutes.py  engy_emissions.py           # kind="api"
     surplus.py engy.py antseed.py gm.py    # kind="scrape"
   store.py            # SQLite open / upsert / query
   build.py            # store -> dashboard/data.json
@@ -61,8 +62,8 @@ Every adapter — API or scrape, daily or epoch-grain — exposes one function:
 def fetch() -> list[tuple[str, str, float]]:   # (day 'YYYY-MM-DD' UTC, metric, value)
 ```
 
-Per-source shape differences (gm's epoch rollup, BlockRun's 24h snapshot, Engy's
-per-model count arrays) are absorbed inside the adapter. `store.py` and `build.py` never learn
+Per-source shape differences (gm's epoch rollup, Engy's per-model count arrays, the
+emissions snapshot) are absorbed inside the adapter. `store.py` and `build.py` never learn
 that sources differ.
 
 Every adapter sends a browser-style `User-Agent`; several sources sit behind Cloudflare
@@ -85,7 +86,7 @@ CREATE TABLE daily (
 );
 ```
 
-Long format, not wide. The six players expose genuinely different metric sets; a wide
+Long format, not wide. The five players expose genuinely different metric sets; a wide
 table would be mostly NULL and would need a migration every time a player adds a field or
 a player is added.
 
@@ -152,7 +153,12 @@ would otherwise silently misalign every value it writes.
 
 `capture_emissions`: SN53 alpha emissions valued in USD, reusing the math already in
 `inference-farm/scripts/poll_sn53.py` (`miner_pool_usd_day`). Requires the taostats key that
-project already uses.
+project already uses. It is a daily-rate **snapshot**, not a settlement figure: assigned to
+the UTC day preceding the scrape and never revised; a missed day is a permanent gap. It is a
+separate source module so a missing key cannot block Engy's requests/tokens.
+
+`build.py` excludes the current UTC day for every player, since every daily source reports
+it partially. Assigning the snapshot to the preceding day keeps it visible under that rule.
 
 ### AntSeed — `kind="scrape"`
 
@@ -183,24 +189,9 @@ indistinguishable from a collapse in traffic.
 run drops epochs permanently, and a gap in `gm_epochs` silently understates a day rather than
 erroring.
 
-### BlockRun — `kind="api"`
-
-- `GET https://blockrun.ai/api/v1/health/overview` -> `totalCalls24h`
-- `GET https://blockrun.ai/api/v1/health/chain` -> `totalSettlements24h`,
-  `failedSettlements24h`, `successRate24h`
-
-These are **rolling 24h snapshots, not calendar-day totals.** Assigned to the UTC day
-*preceding* the scrape — the 24h window ending at ~08:10 UTC mostly covers it — and never
-revised. A missed day is permanently lost — it cannot be interpolated, and must not be.
-Series carries a distinct marker so it is never read as a true daily total. Engy's
-`capture_emissions` (a daily-rate snapshot from taostats) follows the same rule.
-
-`build.py` excludes the current UTC day for every player, since every daily source reports
-it partially. Assigning snapshots to the preceding day keeps them visible under that rule.
-
 ## Failure behaviour
 
-Four of seven adapters parse undocumented payloads that will change without notice. The
+Four of six adapters parse undocumented payloads that will change without notice. The
 governing rule: **a silently zeroed day is far worse than a visible gap**, because it corrupts
 history that cannot be rebuilt.
 
@@ -225,7 +216,7 @@ total; it defaults to the most recent bar. Hovering dims every other bar.
 Period = one day for the 30d / 90d ranges and one ISO week for "All". The final week on
 "All" is usually partial; it is hatched and the panel says how many of its 7 days are in.
 
-1. **Requests** — Chutes, AntSeed, Surplus, Engy, gm, BlockRun
+1. **Requests** — Chutes, AntSeed, Surplus, Engy, gm
 2. **Tokens** — Chutes, AntSeed, Surplus, Engy
 3. **Buyer spend** — Chutes USD, AntSeed GMV, gm value
 4. **Protocol capture** — AntSeed fees, Engy emissions
@@ -279,7 +270,6 @@ plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the exist
 
 - Surplus and Engy start at ~30 days and deepen only from first run. Chutes and AntSeed
   carry real back history, so the "All" view is uneven for roughly two months.
-- gm and BlockRun start empty and are snapshot-derived; BlockRun's series is a rolling 24h
-  figure, not a calendar day.
+- gm starts empty and needs two scrapes before it emits its first day.
 - Engy's emissions series measures token issuance, not customer payment. It sits on the
   capture chart for that reason and is not comparable to AntSeed fees without that caveat.

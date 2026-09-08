@@ -1,0 +1,6 @@
+data/*.db
+dashboard/data.json
+__pycache__/
+.pytest_cache/
+.venv/
+scrape.log

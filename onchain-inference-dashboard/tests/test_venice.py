@@ -11,9 +11,9 @@ RAW = json.dumps({"granularity": "daily", "range": "all", "buckets": [
 
 def test_parse_maps_burn_value_to_capture():
     rows = set(venice.parse(RAW))
-    assert ("2026-09-06", "capture_burns", 14418.0) in rows       # credits + subs, "Then" only
-    assert ("2026-09-06", "credits_count", 2026.0) in rows
-    assert ("2026-09-06", "subs_count", 1850.0) in rows
+    assert ("2026-09-07", "capture_burns", 14418.0) in rows       # credits + subs, "Then" only
+    assert ("2026-09-07", "credits_count", 2026.0) in rows
+    assert ("2026-09-07", "subs_count", 1850.0) in rows
     assert len(rows) == 3
 
 

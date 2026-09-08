@@ -1,7 +1,7 @@
 """Single HTTP entrypoint for every adapter.
 
-venicestats.com returns 403 to Python's default User-Agent, so every request goes
-out with a browser-style UA.
+Several sources sit behind Cloudflare and reject Python's default User-Agent outright,
+so every request goes out with a browser-style UA.
 """
 
 import urllib.request

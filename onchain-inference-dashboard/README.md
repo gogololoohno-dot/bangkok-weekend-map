@@ -1,6 +1,6 @@
 # Onchain Inference Dashboard
 
-Daily scraper + single-file dashboard tracking 7 onchain inference players.
+Daily scraper + single-file dashboard tracking 6 onchain inference players.
 Design: `../docs/superpowers/specs/2026-09-08-onchain-inference-dashboard-design.md`
 
 ## Run
@@ -26,7 +26,6 @@ least one source failed — check the log before trusting that day.
 | antseed | scrape | requests, tokens, spend_gmv, capture_fees, dau, settles |
 | surplus | scrape | requests, tokens_in/out/cache |
 | engy | scrape + api | requests, tokens; capture_emissions (taostats key from `../inference-farm/.env`) |
-| venice | api | capture_burns, credits_count, subs_count |
 | gm | scrape | requests, spend_usd (epoch rollup; needs two scrapes to emit a day) |
 | blockrun | api | requests, settlements (rolling 24h, previous UTC day) |
 

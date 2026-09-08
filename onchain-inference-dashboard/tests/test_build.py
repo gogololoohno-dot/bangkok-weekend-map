@@ -19,7 +19,7 @@ def _seed(conn):
         ("2026-09-07", "spend_gmv", 7.0), ("2026-09-07", "capture_fees", 0.3),
         ("2026-09-07", "dau", 4.0),
     ], now=NOW)
-    store.upsert_daily(conn, "venice", [("2026-09-07", "capture_burns", 9.0)], now=NOW)
+    store.upsert_daily(conn, "engy", [("2026-09-07", "capture_emissions", 9.0)], now=NOW)
 
 
 def test_build_groups_and_derives(tmp_path):
@@ -32,7 +32,7 @@ def test_build_groups_and_derives(tmp_path):
     assert ch["spend"]["chutes"] == [["2026-09-06", 5.0]]
     assert ch["spend"]["antseed"] == [["2026-09-07", 7.0]]
     assert ch["capture"]["antseed"] == [["2026-09-07", 0.3]]
-    assert ch["capture"]["venice"] == [["2026-09-07", 9.0]]
+    assert ch["capture"]["engy"] == [["2026-09-07", 9.0]]
     assert ch["tokens_per_request"]["chutes"] == [["2026-09-06", 10.0], ["2026-09-07", 10.0]]
     assert ch["tokens_per_request"]["antseed"] == [["2026-09-07", 3.0]]
     assert "dau" not in json.dumps(ch)
@@ -43,15 +43,15 @@ def test_build_excludes_today_and_reports_through(tmp_path):
     _seed(conn)
     out = build.build(conn, now=NOW)
     assert all(d < "2026-09-08" for series in out["charts"]["requests"].values() for d, _ in series)
-    assert out["through"] == {"chutes": "2026-09-07", "antseed": "2026-09-07", "venice": "2026-09-07"}
+    assert out["through"] == {"chutes": "2026-09-07", "antseed": "2026-09-07", "engy": "2026-09-07"}
 
 
 def test_build_absent_player_absent_from_chart(tmp_path):
     conn = store.connect(tmp_path / "t.db")
     _seed(conn)
     out = build.build(conn, now=NOW)
-    assert "venice" not in out["charts"]["requests"]
-    assert "venice" in out["players"]
+    assert "engy" not in out["charts"]["requests"]      # seeded with capture only
+    assert "engy" in out["players"]
 
 
 def test_write_creates_file(tmp_path):

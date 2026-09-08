@@ -12,7 +12,7 @@ are actually doing.
 
 ## Roster and coverage
 
-Seven players. No player covers every metric, and the gaps are load-bearing
+Six players. No player covers every metric, and the gaps are load-bearing
 information — they are rendered, not hidden.
 
 | Player | req/day | tok/day | buyer spend | protocol capture | History at build time | Access |
@@ -21,9 +21,13 @@ information — they are rendered, not hidden.
 | AntSeed | yes | yes | yes (GMV) | yes (fees) | 153 days (from 2026-04-09) | HTML scrape |
 | Surplus | yes | yes | — | — | 28 days rolling | HTML scrape |
 | Engy (SN53) | yes | yes | — | yes (emissions) | 31 days rolling | HTML scrape + taostats |
-| Venice | — | — | — | yes (burns) | 305 days (from 2025-11-07) | public REST |
 | gm (SN28) | yes | — | yes | — | none — forward only | HTML scrape |
 | BlockRun | yes | — | — | — | none — forward only | public REST |
+
+Removed after the first build: Venice. venicestats.com is a third-party token tracker, not
+a Venice dashboard — Venice itself discloses no usage or revenue. The only onchain series
+is the fixed burn per purchase (~$5), which measures neither demand nor capture in a way
+comparable to the others. Dropped on 2026-09-08.
 
 Rejected after checking: Targon (hardware sales page, no usage stats), Nineteen (403),
 inference.net, Dolphin, UsePod, OpenVecta, DGrid, SolRouter, Actual, Instant, Verathos,
@@ -37,7 +41,7 @@ onchain-inference-dashboard/
   scrape.py           # entrypoint — fetch all sources, upsert
   sources/
     __init__.py       # SOURCES registry
-    chutes.py  venice.py  blockrun.py      # kind="api"
+    chutes.py  blockrun.py                 # kind="api"
     surplus.py engy.py antseed.py gm.py    # kind="scrape"
   store.py            # SQLite open / upsert / query
   build.py            # store -> dashboard/data.json
@@ -58,8 +62,11 @@ def fetch() -> list[tuple[str, str, float]]:   # (day 'YYYY-MM-DD' UTC, metric, 
 ```
 
 Per-source shape differences (gm's epoch rollup, BlockRun's 24h snapshot, Engy's
-date-less arrays) are absorbed inside the adapter. `store.py` and `build.py` never learn
+per-model count arrays) are absorbed inside the adapter. `store.py` and `build.py` never learn
 that sources differ.
+
+Every adapter sends a browser-style `User-Agent`; several sources sit behind Cloudflare
+and return 403 to Python's default.
 
 The registry records `kind: "api" | "scrape"` and the metrics each source declares. `kind`
 drives a badge in the UI: a flat line from an API source and a flat line from a scraped
@@ -78,7 +85,7 @@ CREATE TABLE daily (
 );
 ```
 
-Long format, not wide. The seven players expose genuinely different metric sets; a wide
+Long format, not wide. The six players expose genuinely different metric sets; a wide
 table would be mostly NULL and would need a migration every time a player adds a field or
 a player is added.
 
@@ -123,31 +130,6 @@ most important correctness property in the system.
 
 The 20MB daily fetch is the largest cost in the pipeline. The API sends no `ETag` or
 `Last-Modified`, so it cannot be short-circuited; it is simply fetched once a day.
-
-### Venice — `kind="api"`
-
-- `GET https://venicestats.com/api/burns-timeline?granularity=daily&range=all`
-  `{buckets: [{t (epoch ms), discUsdThen, discUsdNow, proSubUsdThen, creditsUsdThen,
-  creditsCount, ...}]}`, daily from 2025-11-07 (305 days as of 2026-09-08).
-
-Mapping:
-- `capture_burns` <- `creditsUsdThen + proSubUsdThen` — USD value of programmatic burns
-  triggered by API credit purchases and subscriptions. Verified against live data:
-  `creditsUsdThen` is ~$5 per burn and `proSubUsdThen` ~$2.2 per sub, i.e. the burn
-  schedule, **not** the purchase amount. This is value the protocol removes from
-  circulation — protocol capture, the same category as AntSeed fees — and it is measured.
-- `credits_count` <- `creditsCount`, `subs_count` <- `proSubCount`. Stored, off-chart.
-  VeniceStats' headline "implied purchases" is `count × ~$100`, a multiplier they assume.
-  Adopting it would put an inferred number on the buyer-spend chart; deferred until the
-  multiplier is confirmed from Venice's own pricing.
-- `discUsdThen` (discretionary treasury buyback) is **not** revenue and is not ingested.
-
-The endpoint returns **403 to Python's default User-Agent.** Every adapter sends a
-browser-style `User-Agent` header.
-
-**Use the `*UsdThen` fields, never `*UsdNow`.** `Now` revalues past burns at today's VVV
-price, so every historical point would silently move each time the token repriced. That
-would make the chart lie about the past.
 
 ### Surplus — `kind="scrape"`
 
@@ -240,16 +222,15 @@ across every chart; legend doubles as show/hide.
 1. **Requests/day** — log y — Chutes, AntSeed, Surplus, Engy, gm, BlockRun
 2. **Tokens/day** — log y — Chutes, AntSeed, Surplus, Engy
 3. **Buyer spend/day** — log y — Chutes USD, AntSeed GMV, gm value
-4. **Protocol capture/day** — log y — AntSeed fees, Engy emissions, Venice burns
+4. **Protocol capture/day** — log y — AntSeed fees, Engy emissions
 5. **Tokens per request** — linear y — Chutes, AntSeed, Surplus, Engy (the four with both
    inputs); derived at build time, not stored
 
 Log scale on 1–4 because the players span ~three orders of magnitude (Chutes ~3.6M req/day
 against gm ~10K/epoch); linear would flatten everything but the leader into the axis.
 
-Charts 3 and 4 are split deliberately. "Revenue" means five different things across this
-roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), the USD value of
-onchain burns (Venice), traffic value served (gm), and token emissions that are not buyer
+Charts 3 and 4 are split deliberately. "Revenue" means four different things across this
+roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), traffic value served (gm), and token emissions that are not buyer
 money at all (Engy). One axis labelled "revenue/day" would be the most misleading
 chart on the page. Buyer spend vs protocol capture is the honest cut, and the gap between the
 two is itself the interesting quantity.
@@ -283,11 +264,9 @@ plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the exist
 
 ## Known limitations
 
-- Surplus and Engy start at ~30 days and deepen only from first run. Chutes, Venice and AntSeed
+- Surplus and Engy start at ~30 days and deepen only from first run. Chutes and AntSeed
   carry real back history, so the "All" view is uneven for roughly two months.
 - gm and BlockRun start empty and are snapshot-derived; BlockRun's series is a rolling 24h
   figure, not a calendar day.
-- Venice appears only on protocol capture, and only as burn value. It publishes no usage
-  data, and its actual buyer spend is not measured onchain — only a fixed burn per purchase.
 - Engy's emissions series measures token issuance, not customer payment. It sits on the
   capture chart for that reason and is not comparable to AntSeed fees without that caveat.

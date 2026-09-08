@@ -15,7 +15,7 @@ CHARTS = {
     "requests": {"requests"},
     "tokens":   {"tokens", "tokens_in", "tokens_out", "tokens_cache"},
     "spend":    {"spend_usd", "spend_gmv"},
-    "capture":  {"capture_fees", "capture_emissions", "capture_burns"},
+    "capture":  {"capture_fees", "capture_emissions"},
 }
 
 

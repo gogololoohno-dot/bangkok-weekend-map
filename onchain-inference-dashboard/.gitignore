@@ -4,3 +4,4 @@ __pycache__/
 .pytest_cache/
 .venv/
 scrape.log
+dashboard/onchain-inference-dashboard.html

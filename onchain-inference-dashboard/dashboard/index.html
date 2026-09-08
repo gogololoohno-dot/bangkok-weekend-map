@@ -70,6 +70,7 @@
   <div id="charts"></div>
 </div>
 
+<!-- DATA -->
 <script>
 const COLORS = { chutes:'#111111', antseed:'#c1121f', surplus:'#1d4ed8', engy:'#e08a00' };
 const CHARTS = [
@@ -246,11 +247,15 @@ document.getElementById('ranges').onclick = (e) => {
   render();
 };
 
-fetch('data.json').then(r => r.json()).then(d => {
+function start(d) {
   DATA = d;
   document.getElementById('gen').textContent = `generated ${d.generated_at.replace('T',' ').slice(0,16)} UTC · ${Object.keys(d.players).length} players · hover a bar for the breakdown · click a tile to toggle`;
   render();
-}).catch(err => { document.getElementById('gen').textContent = 'data.json missing — run scrape.py then build.py'; console.error(err); });
+}
+// The standalone export (build.py) inlines the data as window.__DATA__; the served page fetches it.
+if (window.__DATA__) start(window.__DATA__);
+else fetch('data.json').then(r => r.json()).then(start)
+  .catch(err => { document.getElementById('gen').textContent = 'data.json missing — run scrape.py then build.py'; console.error(err); });
 </script>
 </body>
 </html>

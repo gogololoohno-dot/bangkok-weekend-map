@@ -60,3 +60,14 @@ def test_write_creates_file(tmp_path):
     target = tmp_path / "data.json"
     build.write(conn, target, now=NOW)
     assert json.loads(target.read_text())["generated_at"].startswith("2026-09-08")
+
+
+def test_write_standalone_inlines_data(tmp_path):
+    conn = store.connect(tmp_path / "t.db")
+    _seed(conn)
+    (tmp_path / "index.html").write_text("<body>\n<!-- DATA -->\n<script>x</script>", encoding="utf-8")
+    out = build.write_standalone(conn, tmp_path / "index.html", tmp_path / "standalone.html", now=NOW)
+    html = out.read_text(encoding="utf-8")
+    assert "<!-- DATA -->" not in html
+    assert "window.__DATA__" in html and '"generated_at": "2026-09-08' in html or '"generated_at":"2026-09-08' in html
+    assert html.endswith("<script>x</script>")

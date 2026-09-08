@@ -9,6 +9,8 @@ import store
 from sources import PLAYERS
 
 OUT_PATH = Path(__file__).parent / "dashboard" / "data.json"
+INDEX_PATH = Path(__file__).parent / "dashboard" / "index.html"
+STANDALONE_PATH = Path(__file__).parent / "dashboard" / "onchain-inference-dashboard.html"
 
 # chart -> metrics summed per (player, day)
 CHARTS = {
@@ -59,6 +61,18 @@ def write(conn, path: Path = OUT_PATH, now: dt.datetime | None = None) -> None:
     path.write_text(json.dumps(build(conn, now)), encoding="utf-8")
 
 
+def write_standalone(conn, index: Path = INDEX_PATH, path: Path = STANDALONE_PATH,
+                     now: dt.datetime | None = None) -> Path:
+    """Single-file copy of the dashboard with the data inlined, for sending around."""
+    payload = json.dumps(build(conn, now)).replace("</", "<\\/")   # never close the script tag early
+    html = index.read_text(encoding="utf-8").replace(
+        "<!-- DATA -->", f"<script>window.__DATA__ = {payload};</script>")
+    path.write_text(html, encoding="utf-8")
+    return path
+
+
 if __name__ == "__main__":
-    write(store.connect())
+    conn = store.connect()
+    write(conn)
     print(f"wrote {OUT_PATH}")
+    print(f"wrote {write_standalone(conn)}")

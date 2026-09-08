@@ -21,7 +21,7 @@ information — they are rendered, not hidden.
 | AntSeed | yes | yes | yes (GMV) | yes (fees) | 153 days (from 2026-04-09) | HTML scrape |
 | Surplus | yes | yes | — | — | 28 days rolling | HTML scrape |
 | Engy (SN53) | yes | yes | — | yes (emissions) | 31 days rolling | HTML scrape + taostats |
-| Venice | — | — | yes (implied) | — | 305 days (from 2025-11-07) | public REST |
+| Venice | — | — | — | yes (burns) | 305 days (from 2025-11-07) | public REST |
 | gm (SN28) | yes | — | yes | — | none — forward only | HTML scrape |
 | BlockRun | yes | — | — | — | none — forward only | public REST |
 
@@ -94,7 +94,12 @@ CREATE TABLE gm_epochs (
 );
 ```
 
-**Write rule: upsert the trailing 3 days; never modify anything older.**
+**Write rule: insert any `(player, day, metric)` that is missing; update an existing row
+only if `day` is within the trailing 3 days; never modify anything older.**
+
+Insert-if-missing is what backfills: the first run banks Chutes' 587 days, and a source that
+was unreachable for five days gets those days filled from its rolling window on the next
+successful run. The 3-day update window is what protects the past.
 
 The current day is always partial — Surplus explicitly draws a projected cap on it — so it
 must stay revisable. But days that have aged out of a source's rolling window can never be
@@ -116,8 +121,8 @@ most important correctness property in the system.
 
 `/daily_revenue_summary` returns 401 and is not used.
 
-The 20MB daily fetch is the largest cost in the pipeline. Send `If-None-Match` and skip the
-parse on 304.
+The 20MB daily fetch is the largest cost in the pipeline. The API sends no `ETag` or
+`Last-Modified`, so it cannot be short-circuited; it is simply fetched once a day.
 
 ### Venice — `kind="api"`
 
@@ -126,11 +131,19 @@ parse on 304.
   creditsCount, ...}]}`, daily from 2025-11-07 (305 days as of 2026-09-08).
 
 Mapping:
-- `spend_credits` <- `creditsUsdThen` — implied API credit purchases. This is the inference
-  spend series and the one that appears on the buyer-spend chart.
-- `spend_subs` <- `proSubUsdThen` — consumer subscriptions. Stored, off-chart by default;
-  it is not API inference demand.
+- `capture_burns` <- `creditsUsdThen + proSubUsdThen` — USD value of programmatic burns
+  triggered by API credit purchases and subscriptions. Verified against live data:
+  `creditsUsdThen` is ~$5 per burn and `proSubUsdThen` ~$2.2 per sub, i.e. the burn
+  schedule, **not** the purchase amount. This is value the protocol removes from
+  circulation — protocol capture, the same category as AntSeed fees — and it is measured.
+- `credits_count` <- `creditsCount`, `subs_count` <- `proSubCount`. Stored, off-chart.
+  VeniceStats' headline "implied purchases" is `count × ~$100`, a multiplier they assume.
+  Adopting it would put an inferred number on the buyer-spend chart; deferred until the
+  multiplier is confirmed from Venice's own pricing.
 - `discUsdThen` (discretionary treasury buyback) is **not** revenue and is not ingested.
+
+The endpoint returns **403 to Python's default User-Agent.** Every adapter sends a
+browser-style `User-Agent` header.
 
 **Use the `*UsdThen` fields, never `*UsdNow`.** `Now` revalues past burns at today's VVV
 price, so every historical point would silently move each time the token repriced. That
@@ -150,7 +163,11 @@ would make the chart lie about the past.
 - Sum across models per index -> `requests`, `tokens`.
 
 **The `counts` arrays carry no dates.** Position must be mapped to a date:
-`day[i] = today_utc - (30 - i)`. This is the most fragile parse in the system — if the window
+`day[i] = anchor - (30 - i)`, where `anchor` is the date parsed from the page's own
+"Data as of YYYY-MM-DD HH:MM UTC" footer — **not** the scraper's clock. The page is an hourly
+rollup, so around midnight UTC the scraper's date and the page's date can differ by one; using
+the page's anchor makes the alignment independent of when the job runs. This is the most
+fragile parse in the system — if the window
 length ever changes from 31 the whole series shifts silently, corrupting every day it writes.
 Guard: assert `len(counts) == 31` for every model and raise otherwise. Where the rendered
 axis labels are extractable, cross-check the first and last against the derived dates.
@@ -175,8 +192,13 @@ project already uses.
   back history and no margin.
 
 Rollup: upsert rows into `gm_epochs` keyed on epoch number (dedupes across scrapes), then
-bucket by the UTC day of `finalized_at` -> `requests`, `spend_usd`. Emit only days whose
-epochs are fully covered; drop the current partial day, since a half-summed day is
+bucket by the UTC day of `finalized_at` -> `requests`, `spend_usd`.
+
+Epoch numbers are consecutive, which gives an exact completeness test: a day is emitted only
+if (a) at least one epoch is finalized on a later day, and (b) every epoch number from the
+last one finalized before the day to the first one finalized after it is present. A day with
+a missing epoch is withheld entirely, so a scrape gap shows as a visible hole rather than an
+understated day. The current partial day is never emitted, since a half-summed day is
 indistinguishable from a collapse in traffic.
 
 **Scrape gm twice daily.** A single daily scrape has exactly zero margin — one late or failed
@@ -216,8 +238,8 @@ across every chart; legend doubles as show/hide.
 
 1. **Requests/day** — log y — Chutes, AntSeed, Surplus, Engy, gm, BlockRun
 2. **Tokens/day** — log y — Chutes, AntSeed, Surplus, Engy
-3. **Buyer spend/day** — log y — Chutes USD, AntSeed GMV, Venice implied credits, gm value
-4. **Protocol capture/day** — log y — AntSeed fees, Engy emissions
+3. **Buyer spend/day** — log y — Chutes USD, AntSeed GMV, gm value
+4. **Protocol capture/day** — log y — AntSeed fees, Engy emissions, Venice burns
 5. **Tokens per request** — linear y — Chutes, AntSeed, Surplus, Engy (the four with both
    inputs); derived at build time, not stored
 
@@ -225,9 +247,9 @@ Log scale on 1–4 because the players span ~three orders of magnitude (Chutes ~
 against gm ~10K/epoch); linear would flatten everything but the leader into the axis.
 
 Charts 3 and 4 are split deliberately. "Revenue" means five different things across this
-roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), implied purchases
-back-derived from onchain burns (Venice), traffic value served (gm), and token emissions that
-are not buyer money at all (Engy). One axis labelled "revenue/day" would be the most misleading
+roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), the USD value of
+onchain burns (Venice), traffic value served (gm), and token emissions that are not buyer
+money at all (Engy). One axis labelled "revenue/day" would be the most misleading
 chart on the page. Buyer spend vs protocol capture is the honest cut, and the gap between the
 two is itself the interesting quantity.
 
@@ -241,7 +263,8 @@ Supporting UI:
 
 Scheduled daily ~08:10 UTC (after Surplus generates ~08:01 UTC and Engy's hourly rollup lands),
 plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the existing
-`BangkokWeekendUpdate` pattern.
+`BangkokWeekendUpdate` pattern. Task Scheduler triggers are in local time: on this machine
+(Asia/Bangkok, UTC+7) that is 15:10 and 03:10.
 
 ## Success criteria
 
@@ -263,6 +286,7 @@ plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the exist
   carry real back history, so the "All" view is uneven for roughly two months.
 - gm and BlockRun start empty and are snapshot-derived; BlockRun's series is a rolling 24h
   figure, not a calendar day.
-- Venice appears only on buyer spend. It publishes no usage data.
+- Venice appears only on protocol capture, and only as burn value. It publishes no usage
+  data, and its actual buyer spend is not measured onchain — only a fixed burn per purchase.
 - Engy's emissions series measures token issuance, not customer payment. It sits on the
   capture chart for that reason and is not comparable to AntSeed fees without that caveat.

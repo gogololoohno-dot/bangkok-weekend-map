@@ -12,7 +12,7 @@ are actually doing.
 
 ## Roster and coverage
 
-Five players. No player covers every metric, and the gaps are load-bearing
+Four players. No player covers every metric, and the gaps are load-bearing
 information — they are rendered, not hidden.
 
 | Player | req/day | tok/day | buyer spend | protocol capture | History at build time | Access |
@@ -21,7 +21,6 @@ information — they are rendered, not hidden.
 | AntSeed | yes | yes | yes (GMV) | yes (fees) | 153 days (from 2026-04-09) | HTML scrape |
 | Surplus | yes | yes | — | — | 28 days rolling | HTML scrape |
 | Engy (SN53) | yes | yes | — | yes (emissions) | 31 days rolling | HTML scrape + taostats |
-| gm (SN28) | yes | — | yes | — | none — forward only | HTML scrape |
 
 Removed after the first build (2026-09-08):
 - **Venice.** venicestats.com is a third-party token tracker, not a Venice dashboard — Venice
@@ -29,6 +28,9 @@ Removed after the first build (2026-09-08):
   purchase (~$5), which measures neither demand nor capture comparably.
 - **BlockRun.** Exposes a single rolling-24h number with no history; at ~900 calls/day it
   would take months of snapshots to show anything, and even then not calendar days.
+- **gm (SN28).** Exposes only the last 20 epochs (~24h) with no history, so it had nothing to
+  show on day one and would have needed twice-daily scraping just to accumulate calendar
+  days. Not worth a second scheduled job for a ~10K req/epoch player.
 
 Rejected after checking: Targon (hardware sales page, no usage stats), Nineteen (403),
 inference.net, Dolphin, UsePod, OpenVecta, DGrid, SolRouter, Actual, Instant, Verathos,
@@ -43,7 +45,7 @@ onchain-inference-dashboard/
   sources/
     __init__.py       # SOURCES registry
     chutes.py  engy_emissions.py           # kind="api"
-    surplus.py engy.py antseed.py gm.py    # kind="scrape"
+    surplus.py engy.py antseed.py          # kind="scrape"
   store.py            # SQLite open / upsert / query
   build.py            # store -> dashboard/data.json
   data/inference.db
@@ -56,14 +58,14 @@ Adding a player is one file in `sources/` plus one registry line. Nothing else c
 
 ### Adapter contract
 
-Every adapter — API or scrape, daily or epoch-grain — exposes one function:
+Every adapter — API or scrape — exposes one function:
 
 ```python
 def fetch() -> list[tuple[str, str, float]]:   # (day 'YYYY-MM-DD' UTC, metric, value)
 ```
 
-Per-source shape differences (gm's epoch rollup, Engy's per-model count arrays, the
-emissions snapshot) are absorbed inside the adapter. `store.py` and `build.py` never learn
+Per-source shape differences (Engy's per-model count arrays, the emissions snapshot) are
+absorbed inside the adapter. `store.py` and `build.py` never learn
 that sources differ.
 
 Every adapter sends a browser-style `User-Agent`; several sources sit behind Cloudflare
@@ -86,21 +88,9 @@ CREATE TABLE daily (
 );
 ```
 
-Long format, not wide. The five players expose genuinely different metric sets; a wide
+Long format, not wide. The four players expose genuinely different metric sets; a wide
 table would be mostly NULL and would need a migration every time a player adds a field or
 a player is added.
-
-gm additionally gets an epoch-grain staging table, since its rollup needs dedupe across
-scrapes:
-
-```sql
-CREATE TABLE gm_epochs (
-  epoch INTEGER PRIMARY KEY,
-  finalized_at TEXT NOT NULL,    -- ISO UTC
-  requests INTEGER NOT NULL,
-  value_usd REAL NOT NULL
-);
-```
 
 **Write rule: insert any `(player, day, metric)` that is missing; update an existing row
 only if `day` is within the trailing 3 days; never modify anything older.**
@@ -167,37 +157,15 @@ it partially. Assigning the snapshot to the preceding day keeps it visible under
   "fees":F,"settles":N,"requests":N,"tokens":N}` — 153 days present.
 - -> `requests`, `tokens`, `spend_gmv` (volume), `capture_fees` (fees), `dau`, `settles`.
 
-### gm — `kind="scrape"`
-
-- `GET https://saygm.com/miners`
-- The "Finalized epochs" table is server-rendered HTML with columns
-  Epoch / Finalized / Miners / Gateways / Requests / Value.
-- **Only 20 epochs are exposed** — at ~72 min each that is almost exactly 24 hours, with no
-  back history and no margin.
-
-Rollup: upsert rows into `gm_epochs` keyed on epoch number (dedupes across scrapes), then
-bucket by the UTC day of `finalized_at` -> `requests`, `spend_usd`.
-
-Epoch numbers are consecutive, which gives an exact completeness test: a day is emitted only
-if (a) at least one epoch is finalized on a later day, and (b) every epoch number from the
-last one finalized before the day to the first one finalized after it is present. A day with
-a missing epoch is withheld entirely, so a scrape gap shows as a visible hole rather than an
-understated day. The current partial day is never emitted, since a half-summed day is
-indistinguishable from a collapse in traffic.
-
-**Scrape gm twice daily.** A single daily scrape has exactly zero margin — one late or failed
-run drops epochs permanently, and a gap in `gm_epochs` silently understates a day rather than
-erroring.
-
 ## Failure behaviour
 
-Four of six adapters parse undocumented payloads that will change without notice. The
+Three of five adapters parse undocumented payloads that will change without notice. The
 governing rule: **a silently zeroed day is far worse than a visible gap**, because it corrupts
 history that cannot be rebuilt.
 
 - An adapter whose pattern matches zero rows raises. It does not write an empty day.
 - An adapter that returns fewer rows than the source's known window raises.
-- `scrape.py` isolates each source: one failure does not block the other six.
+- `scrape.py` isolates each source: one failure does not block the others.
 - `scrape.py` exits nonzero if any source failed, so the scheduled task surfaces it.
 - Partial success still commits the sources that succeeded.
 
@@ -216,9 +184,9 @@ total; it defaults to the most recent bar. Hovering dims every other bar.
 Period = one day for the 30d / 90d ranges and one ISO week for "All". The final week on
 "All" is usually partial; it is hatched and the panel says how many of its 7 days are in.
 
-1. **Requests** — Chutes, AntSeed, Surplus, Engy, gm
+1. **Requests** — Chutes, AntSeed, Surplus, Engy
 2. **Tokens** — Chutes, AntSeed, Surplus, Engy
-3. **Buyer spend** — Chutes USD, AntSeed GMV, gm value
+3. **Buyer spend** — Chutes USD, AntSeed GMV
 4. **Protocol capture** — AntSeed fees, Engy emissions
 5. **Tokens per request** — Chutes, AntSeed, Surplus, Engy; Σ tokens ÷ Σ requests per
    period. Not additive, so this chart is **grouped** (one thin bar per player per period)
@@ -233,8 +201,8 @@ A ranked leaderboard table (per-day averages) showed size but lost the time dime
 entirely. Stacked bars show both: the height is the market, the segments are the shares,
 and the sequence is the trend.
 
-Charts 3 and 4 are split deliberately. "Revenue" means four different things across this
-roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), traffic value served (gm), and token emissions that are not buyer
+Charts 3 and 4 are split deliberately. "Revenue" means three different things across this
+roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), and token emissions that are not buyer
 money at all (Engy). One axis labelled "revenue/day" would be the most misleading
 chart on the page. Buyer spend vs protocol capture is the honest cut, and the gap between the
 two is itself the interesting quantity.
@@ -247,10 +215,9 @@ Supporting UI:
   never silently dropped
 - Scraped sources badged distinctly from API sources on the tiles
 
-Scheduled daily ~08:10 UTC (after Surplus generates ~08:01 UTC and Engy's hourly rollup lands),
-plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the existing
-`BangkokWeekendUpdate` pattern. Task Scheduler triggers are in local time: on this machine
-(Asia/Bangkok, UTC+7) that is 15:10 and 03:10.
+Scheduled daily ~08:10 UTC (after Surplus generates ~08:01 UTC and Engy's hourly rollup lands).
+Windows Task Scheduler, matching the existing `BangkokWeekendUpdate` pattern. Task Scheduler
+triggers are in local time: on this machine (Asia/Bangkok, UTC+7) that is 15:10.
 
 ## Success criteria
 
@@ -260,16 +227,13 @@ plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the exist
 3. Corrupt a fixture -> that adapter raises, process exits nonzero, DB unchanged, **other six
    sources still commit**
 4. Engy fixture with 30 instead of 31 buckets -> raises rather than writing shifted dates
-5. gm fixture scraped twice with overlapping epochs -> no double-counting; partial current day
-   excluded
-6. `build.py` -> every series date-sorted; no gaps within a player's covered range
-7. Dashboard opens -> all five ranked charts render; each player present only where it has
+5. `build.py` -> every series date-sorted; no gaps within a player's covered range
+6. Dashboard opens -> all five ranked charts render; each player present only where it has
    data; Surplus listed as not reported on charts 3 and 4
 
 ## Known limitations
 
 - Surplus and Engy start at ~30 days and deepen only from first run. Chutes and AntSeed
   carry real back history, so the "All" view is uneven for roughly two months.
-- gm starts empty and needs two scrapes before it emits its first day.
 - Engy's emissions series measures token issuance, not customer payment. It sits on the
   capture chart for that reason and is not comparable to AntSeed fees without that caveat.

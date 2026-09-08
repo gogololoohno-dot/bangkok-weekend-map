@@ -1,7 +1,7 @@
 """Fetch every source and bank the rows. Usage:
 
-    python scrape.py            # all sources
-    python scrape.py --only gm  # one source (second daily gm run)
+    python scrape.py                # all sources
+    python scrape.py --only chutes  # one source module
 
 Each source is isolated: a failure is logged and the rest still commit. Exit code is 1 if
 any source failed, so the scheduled task shows red instead of silently writing gaps.
@@ -38,7 +38,7 @@ def run(sources, conn) -> list[str]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", help="run a single source module, e.g. gm")
+    ap.add_argument("--only", help="run a single source module, e.g. chutes")
     args = ap.parse_args()
     conn = store.connect()
     failed = run(select(SOURCES, args.only), conn)

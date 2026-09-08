@@ -71,15 +71,14 @@
 </div>
 
 <script>
-const COLORS = { chutes:'#111111', antseed:'#c1121f', surplus:'#1d4ed8', engy:'#e08a00',
-                 gm:'#059669' };
+const COLORS = { chutes:'#111111', antseed:'#c1121f', surplus:'#1d4ed8', engy:'#e08a00' };
 const CHARTS = [
   { key:'requests', title:'Requests', money:false,
-    note:'Stacked per period. Chutes, AntSeed, Surplus, Engy: calendar-day totals. gm: epoch rollup.' },
+    note:'Stacked per period, calendar-day totals.' },
   { key:'tokens', title:'Tokens', money:false,
     note:'Input + output (+ cache where reported). Surplus cache tokens are prompt tokens served from cache.' },
   { key:'spend', title:'Buyer spend (USD)', money:true,
-    note:'What demand paid. Chutes: buyer USD. AntSeed: settlement GMV. gm: traffic value served.' },
+    note:'What demand paid. Chutes: buyer USD. AntSeed: settlement GMV.' },
   { key:'capture', title:'Protocol capture (USD)', money:true,
     note:'What the network kept. AntSeed: fees. Engy: SN53 miner emissions — issuance, not buyer money.' },
   { key:'tokens_per_request', title:'Tokens per request', money:false, grouped:true,

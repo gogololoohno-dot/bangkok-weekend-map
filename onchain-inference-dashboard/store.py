@@ -20,12 +20,6 @@ CREATE TABLE IF NOT EXISTS daily (
   scraped_at TEXT NOT NULL,
   PRIMARY KEY (player, day, metric)
 );
-CREATE TABLE IF NOT EXISTS gm_epochs (
-  epoch        INTEGER PRIMARY KEY,
-  finalized_at TEXT NOT NULL,
-  requests     INTEGER NOT NULL,
-  value_usd    REAL NOT NULL
-);
 """
 
 
@@ -55,19 +49,4 @@ def upsert_daily(conn, player: str, rows, now: dt.datetime | None = None) -> Non
 def all_daily(conn):
     return conn.execute(
         "SELECT player, day, metric, value FROM daily ORDER BY player, day, metric"
-    ).fetchall()
-
-
-def upsert_gm_epochs(conn, epochs) -> None:
-    conn.executemany(
-        "INSERT OR REPLACE INTO gm_epochs (epoch, finalized_at, requests, value_usd) "
-        "VALUES (?, ?, ?, ?)",
-        epochs,
-    )
-    conn.commit()
-
-
-def all_gm_epochs(conn):
-    return conn.execute(
-        "SELECT epoch, finalized_at, requests, value_usd FROM gm_epochs ORDER BY epoch"
     ).fetchall()

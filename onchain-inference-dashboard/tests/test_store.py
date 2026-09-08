@@ -15,7 +15,7 @@ def rows(conn):
 def test_connect_creates_tables(tmp_path):
     conn = fresh(tmp_path)
     names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert {"daily", "gm_epochs"} <= names
+    assert "daily" in names
 
 
 def test_upsert_inserts_new_rows(tmp_path):
@@ -50,14 +50,6 @@ def test_upsert_is_idempotent(tmp_path):
     store.upsert_daily(conn, "chutes", batch, now=NOW)
     store.upsert_daily(conn, "chutes", batch, now=NOW)
     assert len(rows(conn)) == 2
-
-
-def test_gm_epochs_upsert_dedupes(tmp_path):
-    conn = fresh(tmp_path)
-    e = [(24989, "2026-09-08T08:16:00+00:00", 10455, 652.99)]
-    store.upsert_gm_epochs(conn, e)
-    store.upsert_gm_epochs(conn, e)
-    assert store.all_gm_epochs(conn) == e
 
 
 def test_all_daily_returns_everything(tmp_path):

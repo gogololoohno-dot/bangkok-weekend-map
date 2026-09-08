@@ -20,29 +20,32 @@
   .tbtn { border:1.5px solid var(--ink); background:var(--paper); color:var(--ink); font:700 10px/1 'Archivo'; letter-spacing:.1em; text-transform:uppercase; padding:10px 14px; cursor:pointer; }
   .tbtn.on, .tbtn:hover { background:var(--ink); color:var(--paper); }
 
-  .strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; margin:18px 0 30px; }
+  .strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; margin:18px 0 34px; }
   .tile { border:1.5px solid var(--ink); padding:12px 14px; cursor:pointer; user-select:none; }
   .tile.off { opacity:.35; }
   .tile .name { display:flex; align-items:center; gap:8px; font-weight:700; font-size:13px; }
-  .tile .sw { width:12px; height:12px; border-radius:2px; }
+  .sw { width:12px; height:12px; border-radius:2px; flex:none; }
   .tile .badge { margin-left:auto; font-size:9px; letter-spacing:.1em; text-transform:uppercase; border:1px solid var(--gray); color:var(--gray); padding:2px 5px; }
   .tile .badge.scrape { border-style:dashed; }
   .tile .big { font-family:'Anton'; font-size:26px; margin-top:8px; }
   .tile .meta { font-size:10px; color:var(--gray); margin-top:4px; letter-spacing:.06em; text-transform:uppercase; }
-  .tile .meta .up { color:#087f3f; } .tile .meta .dn { color:#c1121f; }
+  .up { color:#087f3f; } .dn { color:#c1121f; }
 
-  .chart { margin-bottom:28px; }
+  .charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(560px,1fr)); gap:28px 40px; }
   .chart h2 { font-family:'Anton'; font-size:20px; text-transform:uppercase; letter-spacing:.02em; }
-  .chart .note { font-size:11px; color:var(--gray); margin:2px 0 8px; }
-  .chart .absent { font-size:10px; color:var(--gray); letter-spacing:.08em; text-transform:uppercase; margin-top:4px; }
-  svg { width:100%; height:240px; display:block; overflow:visible; }
-  .gridline { stroke:var(--grid); stroke-width:1; }
-  .axis { font-size:10px; fill:var(--gray); font-family:'Archivo'; }
-  .series { fill:none; stroke-width:1.8; stroke-linejoin:round; }
-  .series.snapshot { stroke-dasharray:3 3; }
-  .cross { stroke:var(--ink); stroke-width:1; stroke-dasharray:2 3; pointer-events:none; }
-  .tip { position:fixed; pointer-events:none; background:var(--ink); color:var(--paper); font-size:11px; padding:8px 10px; line-height:1.5; display:none; z-index:9; white-space:nowrap; }
-  .tip b { font-family:'Anton'; font-weight:400; letter-spacing:.04em; }
+  .chart .note { font-size:11px; color:var(--gray); margin:2px 0 12px; min-height:28px; }
+  .chart .absent { font-size:10px; color:var(--gray); letter-spacing:.08em; text-transform:uppercase; margin-top:8px; }
+  .hdr, .row { display:grid; grid-template-columns:22px 150px 1fr 84px 52px 62px 44px; gap:10px; align-items:center; }
+  .hdr { font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--gray); padding-bottom:6px; border-bottom:1px solid var(--line); margin-bottom:6px; }
+  .row { padding:5px 0; font-size:12px; }
+  .row .rk { font-family:'Anton'; font-size:14px; color:var(--gray); }
+  .row .lbl { display:flex; align-items:center; gap:8px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .bar { height:18px; background:var(--grid); position:relative; }
+  .row .bar .fill { position:absolute; inset:0 auto 0 0; }
+  .row .bar .fill.snapshot { background-image:repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,.45) 4px 7px); }
+  .row .val { font-family:'Anton'; font-size:15px; text-align:right; }
+  .row .share, .row .chg, .row .cov { text-align:right; font-size:11px; }
+  .row .share, .row .cov { color:var(--gray); }
 </style>
 </head>
 <body>
@@ -54,38 +57,37 @@
     </div>
     <div class="spacer"></div>
     <div class="ranges" id="ranges">
-      <button class="tbtn" data-days="30">30d</button>
-      <button class="tbtn on" data-days="90">90d</button>
+      <button class="tbtn" data-days="7">7d</button>
+      <button class="tbtn on" data-days="30">30d</button>
+      <button class="tbtn" data-days="90">90d</button>
       <button class="tbtn" data-days="0">All</button>
     </div>
   </header>
   <div class="strip" id="strip"></div>
-  <div id="charts"></div>
+  <div class="charts" id="charts"></div>
 </div>
-<div class="tip" id="tip"></div>
 
 <script>
 const COLORS = { chutes:'#111111', antseed:'#c1121f', surplus:'#1d4ed8', engy:'#e08a00',
                  gm:'#059669', blockrun:'#db2777' };
-const SNAPSHOT = new Set(['blockrun']);     // dashed: rolling-24h figures, not calendar days
+const SNAPSHOT = new Set(['blockrun']);     // hatched: rolling-24h figures, not calendar days
 const CHARTS = [
-  { key:'requests', title:'Requests / day', log:true,
-    note:'Chutes, AntSeed, Surplus, Engy: calendar-day totals. gm: epoch rollup. BlockRun: rolling 24h snapshot (dashed).' },
-  { key:'tokens', title:'Tokens / day', log:true,
+  { key:'requests', title:'Requests / day', money:false,
+    note:'Average per day over the days each player reports in range. BlockRun is a rolling 24h snapshot (hatched).' },
+  { key:'tokens', title:'Tokens / day', money:false,
     note:'Input + output (+ cache where reported). Surplus cache tokens are prompt tokens served from cache.' },
-  { key:'spend', title:'Buyer spend / day (USD)', log:true,
+  { key:'spend', title:'Buyer spend / day (USD)', money:true,
     note:'What demand paid. Chutes: buyer USD. AntSeed: settlement GMV. gm: traffic value served.' },
-  { key:'capture', title:'Protocol capture / day (USD)', log:true,
+  { key:'capture', title:'Protocol capture / day (USD)', money:true,
     note:'What the network kept. AntSeed: fees. Engy: SN53 miner emissions — issuance, not buyer money.' },
-  { key:'tokens_per_request', title:'Tokens per request', log:false,
-    note:'Workload shape. Separates chat routers from long-context / agent traffic.' },
+  { key:'tokens_per_request', title:'Tokens per request', money:false, ratio:true,
+    note:'Σ tokens ÷ Σ requests over the range. Workload shape — separates chat routers from long-context / agent traffic. Not additive, so no share.' },
 ];
-const M = { t:8, r:16, b:24, l:64 };
 
-let DATA, days = 90, hidden = new Set();
+let DATA, days = 30, hidden = new Set();
 
 const fmt = (v) => {
-  if (v == null) return '—';
+  if (v == null || !isFinite(v)) return '—';
   const a = Math.abs(v);
   if (a >= 1e12) return (v/1e12).toFixed(2)+'T';
   if (a >= 1e9)  return (v/1e9).toFixed(2)+'B';
@@ -94,97 +96,100 @@ const fmt = (v) => {
   return v >= 100 ? v.toFixed(0) : v.toFixed(2);
 };
 const usd = (v) => v == null ? '—' : '$' + fmt(v);
+const pct = (v) => v == null ? '' : `<span class="${v>=0?'up':'dn'}">${v>=0?'+':''}${v.toFixed(0)}%</span>`;
 
-function visible(series) {
-  if (!days) return series;
-  const cut = new Date(); cut.setUTCDate(cut.getUTCDate() - days);
-  const c = cut.toISOString().slice(0,10);
-  return series.filter(([d]) => d >= c);
+function cutoff() {
+  if (!days) return '';
+  const c = new Date(); c.setUTCDate(c.getUTCDate() - days);
+  return c.toISOString().slice(0,10);
+}
+const inRange = (series) => series.filter(([d]) => d >= cutoff());
+const sum = (series) => series.reduce((a, [,v]) => a + v, 0);
+
+// 7-day momentum: mean of the last 7 points vs the 7 before, over the player's full series
+function momentum(series) {
+  if (series.length < 14) return null;
+  const a = sum(series.slice(-7)) / 7, b = sum(series.slice(-14, -7)) / 7;
+  return b ? (a/b - 1) * 100 : null;
 }
 
 function renderStrip() {
   const el = document.getElementById('strip'); el.innerHTML = '';
   for (const [p, info] of Object.entries(DATA.players)) {
     const req = DATA.charts.requests[p] || [];
-    const cap = DATA.charts.capture[p] || [];
     const spend = DATA.charts.spend[p] || [];
+    const cap = DATA.charts.capture[p] || [];
     const main = req.length ? req : (spend.length ? spend : cap);
     const isMoney = !req.length;
-    const last = main[main.length-1], prev = main[main.length-8];
-    let chg = last && prev && prev[1] ? (last[1]/prev[1]-1)*100 : null;
-    if (chg != null && Math.abs(chg) < 0.5) chg = 0;    // avoid "-0%"
+    const last = main[main.length-1];
+    let chg = momentum(main);
+    if (chg != null && Math.abs(chg) < 0.5) chg = 0;
     const tile = document.createElement('div');
     tile.className = 'tile' + (hidden.has(p) ? ' off' : '');
     tile.innerHTML = `
       <div class="name"><span class="sw" style="background:${COLORS[p]}"></span>${info.label}
         <span class="badge ${info.kind}">${info.kind}</span></div>
       <div class="big">${last ? (isMoney ? usd(last[1]) : fmt(last[1])) : '—'}</div>
-      <div class="meta">${req.length ? 'req/day' : (spend.length ? 'spend/day' : 'capture/day')}
-        ${chg == null ? '' : `· <span class="${chg>=0?'up':'dn'}">${chg>=0?'+':''}${chg.toFixed(0)}% 7d</span>`}</div>
+      <div class="meta">latest ${req.length ? 'req/day' : (spend.length ? 'spend/day' : 'capture/day')}
+        ${chg == null ? '' : '· ' + pct(chg) + ' 7d'}</div>
       <div class="meta">through ${DATA.through[p] || '—'}</div>`;
     tile.onclick = () => { hidden.has(p) ? hidden.delete(p) : hidden.add(p); render(); };
     el.appendChild(tile);
   }
 }
 
+// One ranked row per player: value = per-day average over the days it reports in range.
+function rankRows(cfg) {
+  const data = DATA.charts[cfg.key] || {};
+  const rows = [];
+  for (const p of Object.keys(DATA.players)) {
+    if (hidden.has(p)) continue;
+    let value, cov;
+    if (cfg.ratio) {
+      const t = inRange(DATA.charts.tokens[p] || []), r = inRange(DATA.charts.requests[p] || []);
+      const rd = new Map(r); const paired = t.filter(([d]) => rd.has(d));
+      cov = paired.length;
+      value = cov ? sum(paired) / sum(paired.map(([d]) => [d, rd.get(d)])) : null;
+    } else {
+      const s = inRange(data[p] || []);
+      cov = s.length;
+      value = cov ? sum(s) / cov : null;
+    }
+    if (value == null) continue;
+    rows.push({ p, value, cov, chg: momentum(data[p] || []) });
+  }
+  rows.sort((a, b) => b.value - a.value);
+  return rows;
+}
+
 function renderChart(cfg) {
   const box = document.createElement('div'); box.className = 'chart';
-  const data = DATA.charts[cfg.key] || {};
-  const present = Object.keys(DATA.players).filter(p => (data[p]||[]).length);
-  const absent = Object.keys(DATA.players).filter(p => !(data[p]||[]).length);
-  box.innerHTML = `<h2>${cfg.title}</h2><div class="note">${cfg.note}</div>`;
+  const rows = rankRows(cfg);
+  const present = new Set(rows.map(r => r.p));
+  const absent = Object.keys(DATA.players).filter(p => !present.has(p) && !hidden.has(p));
+  const f = cfg.money ? usd : fmt;
+  const max = rows.length ? rows[0].value : 1;
+  const total = cfg.ratio ? null : rows.reduce((a, r) => a + r.value, 0);
 
-  const W = Math.min(1424, box.clientWidth || 1200), H = 240;
-  const iw = W - M.l - M.r, ih = H - M.t - M.b;
-  const shown = present.filter(p => !hidden.has(p)).map(p => [p, visible(data[p])]).filter(([,s]) => s.length);
-  if (!shown.length) { box.innerHTML += '<div class="absent">no data in range</div>'; return box; }
-
-  const allDays = [...new Set(shown.flatMap(([,s]) => s.map(([d]) => d)))].sort();
-  const x = (d) => M.l + (allDays.indexOf(d) / Math.max(1, allDays.length-1)) * iw;
-  let vals = shown.flatMap(([,s]) => s.map(([,v]) => v)).filter(v => cfg.log ? v > 0 : true);
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (cfg.log) { lo = Math.pow(10, Math.floor(Math.log10(lo))); hi = Math.pow(10, Math.ceil(Math.log10(hi))); }
-  else { lo = 0; hi = hi * 1.05 || 1; }
-  const y = (v) => cfg.log
-    ? M.t + ih - ((Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo))) * ih
-    : M.t + ih - ((v - lo) / (hi - lo)) * ih;
-
-  let ticks = [];
-  if (cfg.log) for (let e = Math.log10(lo); e <= Math.log10(hi); e++) ticks.push(Math.pow(10, e));
-  else for (let i = 0; i <= 4; i++) ticks.push(lo + (hi - lo) * i / 4);
-
-  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`;
-  for (const t of ticks) svg += `<line class="gridline" x1="${M.l}" x2="${W-M.r}" y1="${y(t)}" y2="${y(t)}"/>
-    <text class="axis" x="${M.l-6}" y="${y(t)+3}" text-anchor="end">${cfg.key==='spend'||cfg.key==='capture' ? usd(t) : fmt(t)}</text>`;
-  const step = Math.max(1, Math.floor(allDays.length / 8));
-  const lastLabelled = Math.floor((allDays.length-1) / step) * step;
-  allDays.forEach((d, i) => {
-    const isLast = i === allDays.length-1;
-    if (i % step === 0 || (isLast && i - lastLabelled >= step / 2))
-      svg += `<text class="axis" x="${x(d)}" y="${H-6}" text-anchor="middle">${d.slice(5)}</text>`; });
-  for (const [p, s] of shown) {
-    const pts = s.filter(([,v]) => !cfg.log || v > 0).map(([d,v]) => `${x(d).toFixed(1)},${y(v).toFixed(1)}`);
-    svg += `<polyline class="series${SNAPSHOT.has(p)?' snapshot':''}" stroke="${COLORS[p]}" points="${pts.join(' ')}"/>`;
+  let html = `<h2>${cfg.title}</h2><div class="note">${cfg.note}</div>`;
+  if (!rows.length) html += '<div class="absent">no data in range</div>';
+  else {
+    html += `<div class="hdr"><span>#</span><span>player</span><span></span><span>avg/day</span><span>share</span><span>7d</span><span>days</span></div>`;
+    rows.forEach((r, i) => {
+      const w = Math.max(1.5, r.value / max * 100);
+      html += `<div class="row">
+        <div class="rk">${i+1}</div>
+        <div class="lbl"><span class="sw" style="background:${COLORS[r.p]}"></span>${DATA.players[r.p].label}</div>
+        <div class="bar"><div class="fill${SNAPSHOT.has(r.p)?' snapshot':''}" style="width:${w}%;background:${COLORS[r.p]}"></div></div>
+        <div class="val">${f(r.value)}</div>
+        <div class="share">${total ? (r.value/total*100).toFixed(0)+'%' : '—'}</div>
+        <div class="chg">${pct(r.chg)}</div>
+        <div class="cov">${r.cov}d</div>
+      </div>`;
+    });
   }
-  svg += `<line class="cross" id="cross-${cfg.key}" y1="${M.t}" y2="${M.t+ih}" x1="-10" x2="-10"/></svg>`;
-  box.innerHTML += svg;
-  if (absent.length) box.innerHTML += `<div class="absent">not reported: ${absent.map(p => DATA.players[p].label).join(' · ')}</div>`;
-
-  const el = box.querySelector('svg');
-  el.onmousemove = (ev) => {
-    const r = el.getBoundingClientRect();
-    const px = (ev.clientX - r.left) / r.width * W;
-    const i = Math.round((px - M.l) / iw * (allDays.length-1));
-    const d = allDays[Math.max(0, Math.min(allDays.length-1, i))];
-    document.querySelectorAll('.cross').forEach(c => { c.setAttribute('x1', x(d)); c.setAttribute('x2', x(d)); });
-    const rows = shown.map(([p, s]) => { const hit = s.find(([dd]) => dd === d);
-      return hit ? `<span style="color:${COLORS[p]}">■</span> ${DATA.players[p].label}: ${cfg.key==='spend'||cfg.key==='capture' ? usd(hit[1]) : fmt(hit[1])}` : null; }).filter(Boolean);
-    const tip = document.getElementById('tip');
-    tip.innerHTML = `<b>${d}</b><br>${rows.join('<br>')}`;
-    tip.style.display = 'block'; tip.style.left = (ev.clientX + 14) + 'px'; tip.style.top = (ev.clientY + 14) + 'px';
-  };
-  el.onmouseleave = () => { document.getElementById('tip').style.display = 'none';
-    document.querySelectorAll('.cross').forEach(c => { c.setAttribute('x1', -10); c.setAttribute('x2', -10); }); };
+  if (absent.length) html += `<div class="absent">not reported: ${absent.map(p => DATA.players[p].label).join(' · ')}</div>`;
+  box.innerHTML = html;
   return box;
 }
 
@@ -203,7 +208,7 @@ document.getElementById('ranges').onclick = (e) => {
 
 fetch('data.json').then(r => r.json()).then(d => {
   DATA = d;
-  document.getElementById('gen').textContent = `generated ${d.generated_at.replace('T',' ').slice(0,16)} UTC · ${Object.keys(d.players).length} players · click a tile to toggle`;
+  document.getElementById('gen').textContent = `generated ${d.generated_at.replace('T',' ').slice(0,16)} UTC · ${Object.keys(d.players).length} players · ranked by per-day average in range · click a tile to toggle`;
   render();
 }).catch(err => { document.getElementById('gen').textContent = 'data.json missing — run scrape.py then build.py'; console.error(err); });
 </script>

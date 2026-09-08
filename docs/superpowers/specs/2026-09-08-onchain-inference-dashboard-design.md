@@ -216,18 +216,28 @@ Single self-contained HTML reading `data.json`. Inline SVG, no chart library, co
 `inference-capital-markets-map.html`. Served locally via a `launch.json` entry, matching the
 existing `oil-dashboard` pattern.
 
-Five charts, one shared UTC x-axis, one shared hover crosshair. Player = colour, consistent
-across every chart; legend doubles as show/hide.
+Five ranked bar charts in the style of OpenRouter's leaderboard, linear scale. Each row is
+one player: rank, colour swatch, bar proportional to the leader, value, share of the
+chart's total, 7-day momentum, and the number of days the player reports in range.
+Player = colour, consistent across every chart; the tile strip doubles as show/hide.
 
-1. **Requests/day** — log y — Chutes, AntSeed, Surplus, Engy, gm, BlockRun
-2. **Tokens/day** — log y — Chutes, AntSeed, Surplus, Engy
-3. **Buyer spend/day** — log y — Chutes USD, AntSeed GMV, gm value
-4. **Protocol capture/day** — log y — AntSeed fees, Engy emissions
-5. **Tokens per request** — linear y — Chutes, AntSeed, Surplus, Engy (the four with both
-   inputs); derived at build time, not stored
+1. **Requests/day** — Chutes, AntSeed, Surplus, Engy, gm, BlockRun
+2. **Tokens/day** — Chutes, AntSeed, Surplus, Engy
+3. **Buyer spend/day** — Chutes USD, AntSeed GMV, gm value
+4. **Protocol capture/day** — AntSeed fees, Engy emissions
+5. **Tokens per request** — Chutes, AntSeed, Surplus, Engy (the four with both inputs);
+   Σ tokens ÷ Σ requests over the range, so it is a weighted ratio, not a mean of daily
+   ratios. Not additive, so no share column.
 
-Log scale on 1–4 because the players span ~three orders of magnitude (Chutes ~3.6M req/day
-against gm ~10K/epoch); linear would flatten everything but the leader into the axis.
+**Ranking value is the per-day average over the days each player reports in range, not a
+period sum.** OpenRouter sums because every model covers its whole period; here Chutes has
+587 days and Surplus 28, so a sum on "All" would be a coverage contest rather than a size
+comparison. The days column makes unequal coverage visible instead of hiding it.
+
+The first version used log-scale line charts on a shared time axis. Log preserved the small
+players but made magnitude unreadable — you could not see who was bigger or by how much,
+which is the primary question. Ranked linear bars answer it directly; trend is carried by
+the 7-day momentum column and the tile strip rather than by a line.
 
 Charts 3 and 4 are split deliberately. "Revenue" means four different things across this
 roster — actual buyer USD (Chutes), marketplace settlement GMV (AntSeed), traffic value served (gm), and token emissions that are not buyer
@@ -236,12 +246,12 @@ chart on the page. Buyer spend vs protocol capture is the honest cut, and the ga
 two is itself the interesting quantity.
 
 Supporting UI:
-- Range selector: 30d / 90d / All
+- Range selector: 7d / 30d / 90d / All — sets the averaging window
 - Header strip: per player, latest value, 7-day change, and **data-through timestamp**, so a
   dead scraper reads as dead rather than as a plateau
 - Absent players render as greyed legend entries with the reason on hover — never as zero,
   never silently dropped
-- Scraped series badged distinctly from API series
+- Scraped sources badged distinctly from API sources; snapshot bars (BlockRun) hatched
 
 Scheduled daily ~08:10 UTC (after Surplus generates ~08:01 UTC and Engy's hourly rollup lands),
 plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the existing
@@ -259,8 +269,8 @@ plus a second gm-only run ~20:10 UTC. Windows Task Scheduler, matching the exist
 5. gm fixture scraped twice with overlapping epochs -> no double-counting; partial current day
    excluded
 6. `build.py` -> every series date-sorted; no gaps within a player's covered range
-7. Dashboard opens -> all five charts render; each player present only where it has data;
-   Surplus greyed on charts 3 and 4
+7. Dashboard opens -> all five ranked charts render; each player present only where it has
+   data; Surplus listed as not reported on charts 3 and 4
 
 ## Known limitations
 

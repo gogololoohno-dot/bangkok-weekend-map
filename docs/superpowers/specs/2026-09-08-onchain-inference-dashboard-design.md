@@ -158,19 +158,15 @@ would make the chart lie about the past.
 
 ### Engy — `kind="scrape"`
 
-- `GET https://provider.engy.ai/requests` -> per-model `{"model": str, "counts": [int x31]}`
+- `GET https://provider.engy.ai/requests` -> embedded RSC payload containing
+  `"buckets":[<epoch seconds> x31], "series":[{"model": str, "counts": [int x31]}, ...]`
 - `GET https://provider.engy.ai/requests?m=tokens` -> same shape, token counts
-- Sum across models per index -> `requests`, `tokens`.
+- `buckets[i]` is the UTC midnight of bucket `i`; sum `counts[i]` across models ->
+  `requests`, `tokens` for that day.
 
-**The `counts` arrays carry no dates.** Position must be mapped to a date:
-`day[i] = anchor - (30 - i)`, where `anchor` is the date parsed from the page's own
-"Data as of YYYY-MM-DD HH:MM UTC" footer — **not** the scraper's clock. The page is an hourly
-rollup, so around midnight UTC the scraper's date and the page's date can differ by one; using
-the page's anchor makes the alignment independent of when the job runs. This is the most
-fragile parse in the system — if the window
-length ever changes from 31 the whole series shifts silently, corrupting every day it writes.
-Guard: assert `len(counts) == 31` for every model and raise otherwise. Where the rendered
-axis labels are extractable, cross-check the first and last against the derived dates.
+The date axis is explicit, so no positional date derivation is needed. Guard: raise if
+`len(counts) != len(buckets)` for any model, or if `buckets` is empty — a length mismatch
+would otherwise silently misalign every value it writes.
 
 `capture_emissions`: SN53 alpha emissions valued in USD, reusing the math already in
 `inference-farm/scripts/poll_sn53.py` (`miner_pool_usd_day`). Requires the taostats key that
@@ -211,9 +207,14 @@ erroring.
 - `GET https://blockrun.ai/api/v1/health/chain` -> `totalSettlements24h`,
   `failedSettlements24h`, `successRate24h`
 
-These are **rolling 24h snapshots, not calendar-day totals.** Written to the day of the scrape
-and never revised. A missed day is permanently lost — it cannot be interpolated, and must not
-be. Series carries a distinct marker so it is never read as a true daily total.
+These are **rolling 24h snapshots, not calendar-day totals.** Assigned to the UTC day
+*preceding* the scrape — the 24h window ending at ~08:10 UTC mostly covers it — and never
+revised. A missed day is permanently lost — it cannot be interpolated, and must not be.
+Series carries a distinct marker so it is never read as a true daily total. Engy's
+`capture_emissions` (a daily-rate snapshot from taostats) follows the same rule.
+
+`build.py` excludes the current UTC day for every player, since every daily source reports
+it partially. Assigning snapshots to the preceding day keeps them visible under that rule.
 
 ## Failure behaviour
 

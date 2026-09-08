@@ -1,0 +1,65 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Multirouter Proxy",
+      "runtimeExecutable": "C:\\Users\\punth\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": ["multirouter/main.py"],
+      "port": 8080
+    }
+    ,{
+      "name": "x402 Dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "cwd": "x402-dashboard"
+    }
+    ,{
+      "name": "travel-scout",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "cwd": "travel-scout"
+    }
+    ,{
+      "name": "Charts Server",
+      "runtimeExecutable": "C:\\Users\\punth\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "7890"],
+      "port": 7890,
+      "cwd": "."
+    }
+    ,{
+      "name": "PolyBond",
+      "runtimeExecutable": "C:\\Users\\punth\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe",
+      "runtimeArgs": ["C:\\Users\\punth\\AppData\\Local\\hermes\\polymarket-bonding\\dashboard_server.py", "--port", "7810"],
+      "port": 7810
+    }
+    ,{
+      "name": "waifu-app",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\punth\\waifu-app && uv run --python 3.11 --with fastapi --with uvicorn[standard] --with edge-tts --with aiohttp main.py"],
+      "port": 8000,
+      "autoPort": true
+    }
+    ,{
+      "name": "oil-dashboard",
+      "runtimeExecutable": "C:\\Users\\punth\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8791", "--directory", "C:\\Users\\punth\\.hermes\\scripts"],
+      "port": 8791
+    }
+    ,{
+      "name": "inference-dashboard",
+      "runtimeExecutable": "C:\\Users\\punth\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8792", "--directory", "C:\\Users\\punth\\New folder\\onchain-inference-dashboard\\dashboard"],
+      "port": 8792
+    }
+    ,{
+      "name": "Vantage",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3001,
+      "autoPort": true,
+      "cwd": "vantage"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+/* Weekend browsing and a detail panel that stays inside the viewport. */
+button, input, select { font:inherit; }
+button, a, select, input { touch-action:manipulation; }
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid #fb923c; outline-offset:3px; }
+.badge { background:#374151; white-space:nowrap; }
+.hsub { display:block; line-height:1.5; }
+.discovery { padding:10px 14px; background:#111827; border-bottom:1px solid #374151; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.discovery input, .discovery select, .action { background:#1f2937; color:#f9fafb; border:1px solid #475569; border-radius:8px; padding:9px 11px; font-size:12px; }
+.discovery input { width:200px; }
+.discovery label { display:flex; align-items:center; gap:5px; font-size:12px; }
+.discovery input[type=checkbox] { width:16px; height:16px; }
+.action { display:inline-flex; align-items:center; justify-content:center; cursor:pointer; text-decoration:none; gap:5px; min-height:40px; }
+.action:hover { border-color:#fb923c; }
+.action.primary { background:#fb923c; color:#111827; border-color:#fb923c; font-weight:700; }
+.view-toggle { display:none; }
+.pill { white-space:nowrap; flex-shrink:0; min-height:28px; }
+.results { padding:8px 14px; font-size:12px; color:#cbd5e1; background:#0f172a; }
+.results a { color:#fdba74; }
+aside { width:360px; min-width:360px; }
+.card { display:grid; grid-template-columns:100px 1fr; padding:12px; gap:12px; }
+.card.no-image { grid-template-columns:1fr; }
+.card-img { width:100px; height:105px; border-radius:8px; }
+.card-body { padding:0; }
+.card-title { font-size:14px; line-height:1.4; }
+.card-meta { font-size:12px; line-height:1.5; }
+.card-desc { font-size:12px; color:#cbd5e1; }
+.card.hide { display:none; }
+.event-badge { display:inline-block; color:#fdba74; font-size:11px; margin:0 5px 5px 0; }
+.card-footer { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+.card-footer .action { min-height:32px; padding:5px 9px; font-size:11px; }
+.empty { padding:28px 18px; color:#cbd5e1; line-height:1.6; }
+.mpin { width:36px; height:36px; display:block; padding:0; background:none; border:0; color:white; }
+.mpin-dot { width:36px; height:36px; }
+.mpin-label { display:none; position:absolute; left:44px; top:0; width:160px; max-width:160px; text-align:left; }
+.mpin:hover .mpin-label, .mpin:focus-visible .mpin-label { display:block; }
+#popup { position:fixed !important; left:auto !important; right:16px !important; top:var(--detail-top,165px) !important; bottom:auto !important; width:min(410px,calc(100vw - 32px)) !important; max-height:calc(100dvh - var(--detail-top,165px) - 16px); overflow:auto; z-index:200; cursor:auto; border-radius:14px; }
+#popup img { height:170px; }
+#popup-body { padding:20px; }
+#popup-body h3 { font-size:21px; line-height:1.3; padding-right:20px; margin-bottom:12px; }
+#popup-meta { font-size:14px; color:#e2e8f0; gap:9px; line-height:1.5; }
+#popup-close { width:36px; height:36px; font-size:18px; }
+.detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
+.detail-note { font-size:12px; color:#cbd5e1; }
+.detail-note a { color:#fdba74; }
+.related { border-top:1px solid #475569; margin-top:12px; padding-top:12px; }
+.related button { display:block; text-align:left; margin-top:7px; width:100%; }
+#source-health { margin:10px 0; font-size:12px; line-height:1.7; }
+#source-health a { color:#fdba74; }
+@media(max-width:760px) {
+  header { padding:10px 12px; }
+  .htitle { font-size:16px; }
+  .hsub { font-size:10px; }
+  .badge { font-size:10px; padding:5px 7px; }
+  .discovery { padding:8px 10px; gap:6px; }
+  .discovery input { flex:1; min-width:130px; }
+  .discovery input[type=checkbox] { flex:none; min-width:0; }
+  .discovery select { max-width:145px; }
+  .view-toggle { display:inline-flex; }
+  .layout { display:block; position:relative; }
+  aside { width:100%; min-width:0; height:100%; border:0; }
+  #map-wrap { width:100%; height:100%; display:none; }
+  body.map-view aside { display:none; }
+  body.map-view #map-wrap { display:block; }
+  #popup { top:auto !important; bottom:12px !important; left:12px !important; right:12px !important; width:auto !important; max-height:80dvh; }
+  .card-img { height:105px; }
+  .card-desc { display:block; }
+  .mpin-label { display:none !important; }
+}

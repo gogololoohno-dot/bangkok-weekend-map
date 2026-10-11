@@ -1,0 +1,180 @@
+{
+  "siam-paragon": {
+    "name": "Siam Paragon",
+    "aliases": [
+      "Siam Paragon"
+    ],
+    "neighborhood": "Siam",
+    "lat": 13.746829,
+    "lng": 100.534918,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/things-to-do/browse-international-galleries-at-art-bangkoks-first-edition",
+    "evidence_note": "Published named-venue map coordinates, checked against event venue."
+  },
+  "the-storeys-one-bangkok": {
+    "name": "The Storeys, One Bangkok",
+    "aliases": [
+      "The Storeys at One Bangkok",
+      "One Bangkok"
+    ],
+    "neighborhood": "Lumphini",
+    "lat": 13.726612,
+    "lng": 100.545995,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/things-to-do/find-hidden-nature-spirits-and-paint-ceramics-at-one-bangkok",
+    "evidence_note": "Published named-venue map coordinates, checked against event venue."
+  },
+  "mitr-street": {
+    "name": "Mitr Street",
+    "aliases": [
+      "Mitr Street, Tha Tien"
+    ],
+    "neighborhood": "Tha Tien",
+    "lat": 13.745155,
+    "lng": 100.49157,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/restaurants/mitr-street-tha-tien",
+    "evidence_note": "Published named-venue map coordinates, checked against event venue."
+  },
+  "play-art-house": {
+    "name": "Play Art House",
+    "aliases": [
+      "PLAY art house"
+    ],
+    "neighborhood": "Song Wat",
+    "lat": 13.737733,
+    "lng": 100.508465,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/things-to-do/sit-with-fading-figures-at-trey-hursts-solo-exhibition",
+    "evidence_note": "Published named-venue map coordinates, checked against event venue."
+  },
+  "sàat": {
+    "name": "sàat",
+    "aliases": [
+      "SAAT(ศาสตร์)",
+      "SAAT"
+    ],
+    "neighborhood": "Hua Lamphong",
+    "lat": 13.736824,
+    "lng": 100.516284,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/things-to-do/eat-grape-leaf-sorbet-with-miso-caramel-and-mochi-at-saats",
+    "evidence_note": "Published named-venue map coordinates, checked against event venue."
+  },
+  "le-café-des-stagiaires": {
+    "name": "Le Café des Stagiaires",
+    "aliases": [
+      "Le Cafe des Stagiaires"
+    ],
+    "neighborhood": "Sathorn",
+    "lat": 13.722314,
+    "lng": 100.525707,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/things-to-do/settle-in-with-a-crochet-hook-and-ambient-music-at-le-cafe-des-stagiaires",
+    "evidence_note": "Published named-venue map coordinates, checked against event venue."
+  },
+  "rajamangala-national-stadium": {
+    "name": "Rajamangala National Stadium",
+    "aliases": [
+      "Rajamangala Stadium"
+    ],
+    "neighborhood": "Bang Kapi",
+    "lat": 13.75557,
+    "lng": 100.621239,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/things-to-do/see-the-weeknd-take-over-rajamangala-for-three-nights",
+    "evidence_note": "Published named-venue map coordinates, checked against event venue."
+  },
+  "river-city": {
+    "name": "River City Bangkok",
+    "aliases": [
+      "River City",
+      "RCB Galleria 5, River City Bangkok"
+    ],
+    "neighborhood": "Talat Noi",
+    "lat": 13.7301721,
+    "lng": 100.5132093,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://rivercitybangkok.com/plan-your-visit/",
+    "evidence_note": "Coordinates from the venue’s official Google Maps link.",
+    "maps_url": "https://goo.gl/maps/Li8Y2XJAd5Ezv2zz7"
+  },
+  "iconsiam": {
+    "name": "ICONSIAM",
+    "aliases": [],
+    "neighborhood": "Charoen Nakhon",
+    "lat": 13.72623,
+    "lng": 100.510968,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/shopping/iconsiam",
+    "evidence_note": "Published named-venue map coordinates."
+  },
+  "dib-bangkok": {
+    "name": "Dib Bangkok",
+    "aliases": [],
+    "neighborhood": "Phra Khanong",
+    "lat": 13.7129126,
+    "lng": 100.5797653,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://dibbangkok.org/plan-your-visit",
+    "maps_url": "https://maps.app.goo.gl/2Nfmyg7VYiej1rf26",
+    "evidence_note": "Place coordinates from the museum’s official map link; viewport centre is different."
+  },
+  "blueprint": {
+    "name": "Blueprint Livehouse",
+    "aliases": [],
+    "neighborhood": "Sukhumvit 26",
+    "lat": 13.7204737,
+    "lng": 100.567219,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.ticketmelon.com/blueprint/parttimeanalog",
+    "evidence_note": "Ticketing page named venue coordinates; address matches the official venue website."
+  },
+  "mutual-bar": {
+    "name": "Mutual Bar",
+    "aliases": [],
+    "neighborhood": "Phrom Phong",
+    "lat": 13.7295421,
+    "lng": 100.5695045,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.ticketmelon.com/bar-thakatha/a-korean-ghostlore",
+    "evidence_note": "Ticketing page named venue coordinates and Sukhumvit 24 address."
+  },
+  "sriwiang": {
+    "name": "Sriwiang Gallery",
+    "aliases": [],
+    "neighborhood": "Bang Rak",
+    "lat": 13.722176,
+    "lng": 100.517401,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.bangkokartcity.org/discover-detail/aesthetics-heritage",
+    "evidence_note": "Exhibition page embedded venue map."
+  },
+  "doc-club": {
+    "name": "Doc Club & Friends",
+    "aliases": [],
+    "neighborhood": "Punnawithi",
+    "lat": 13.682693,
+    "lng": 100.608271,
+    "verified": true,
+    "verified_at": "2026-10-11",
+    "evidence_url": "https://www.timeout.com/bangkok/theater/doc-club-friends",
+    "event_urls": [
+      "https://www.timeout.com/bangkok/theater/doc-club-friends"
+    ],
+    "evidence_note": "Named cinema map location. Do not alias the whole Cloud 11 complex to this tenant."
+  }
+}

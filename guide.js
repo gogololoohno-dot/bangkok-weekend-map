@@ -69,6 +69,7 @@ function applyFilters() {
     var visible=pinGroups[id].filter(matches), pin=document.getElementById('pin-'+id);
     pin.classList.toggle('hidden',!visible.length);
     pin.querySelector('.mpin-dot').textContent=visible.length>1?visible.length:(visible[0]||pinGroups[id][0]).e;
+    pin.querySelector('.mpin-label').textContent=visible.map(function(a){return a.title;}).join(' · ');
   });
   document.getElementById('result-count').textContent=count+' picks'+(currentCity==='bangkok'?' · '+mapped+' with verified map locations':'');
   var empty=document.getElementById('empty-state');
@@ -84,7 +85,7 @@ buildMarkers = function() {
     positions[position]=String(a.id); pinGroups[a.id]=[a];
     var pin=document.createElement('button'); pin.type='button'; pin.className='mpin'; pin.id='pin-'+a.id;
     pin.setAttribute('aria-label','Events at '+(a.venue||a.loc));
-    pin.innerHTML='<span class="mpin-dot" style="background:'+(COLORS[a.cat]||'#888')+'">'+esc(a.e)+'</span><span class="mpin-label">'+esc(a.venue||a.title)+'</span>';
+      pin.innerHTML='<span class="mpin-dot" style="background:'+(COLORS[a.cat]||'#888')+'">'+esc(a.e)+'</span><span class="mpin-label">'+esc(a.title)+'</span>';
     pin.addEventListener('click',function(e){e.stopPropagation(); var chosen=pinGroups[a.id].filter(matches)[0]; if(chosen){showPopup(chosen);highlightCard(chosen.id);}});
     markerLayer.appendChild(pin);
   });

@@ -27,3 +27,9 @@ Refresh without publishing: `python update_bangkok.py --bangkok-only --force --n
 Serve the checkout with `python -m http.server 8765 --bind 127.0.0.1`. Check combined category/day/budget/neighborhood filters, a saved event after reload, a share link, event/ticket/directions links, unconfirmed locations, marker positions at different zooms, mobile list/map switching, and other city tabs.
 
 The interface uses browser storage for saved event IDs, so saves are local to a browser. Sharing uses a stable event ID in the URL fragment; links work while the event remains in the published edition. The Friday refresh is the collection boundary; finished events are hidden locally as time passes, and can be shown with Include finished.
+
+## Mobile and installation
+
+At widths up to 760px, Explore, Map and Saved use the full available view with bottom navigation. Extra filters expand below search; details open in a bottom sheet. Map labels remain visible and move to reduce collisions, with connector lines back to their fixed venue pins. Very dense views can still require zooming.
+
+The web app manifest and PNG icons enable home-screen installation. Install app opens the browser's installation prompt when available, otherwise it shows platform instructions. The installed app loads the same live site and weekly updates. There is no offline cache or push notification subscription; an internet connection is required. This deliberately avoids caching an obsolete weekend edition. Test actual installation on iOS Safari and Android Chrome as device checks in addition to browser viewport testing.

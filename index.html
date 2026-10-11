@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="This Weekend">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/weekend-192.png">
 <title>This Weekend — Bangkok · Singapore · Tokyo · Hong Kong</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -261,14 +266,19 @@ aside::-webkit-scrollbar-thumb { background:#374151; border-radius:3px; }
 
 <div class="discovery" aria-label="Find weekend events">
   <input id="search-events" type="search" aria-label="Search events or venues" placeholder="Search events or venues">
+  <button class="action mobile-only" id="filters-toggle" aria-expanded="false" aria-controls="extra-filters">Filters</button>
+  <div id="extra-filters">
   <select id="day-filter" aria-label="Day"><option value="">Any day</option></select>
   <select id="budget-filter" aria-label="Budget"><option value="">Any budget</option><option value="free">Free entry</option><option value="500">Up to ฿500 entry</option></select>
   <select id="area-filter" aria-label="Neighborhood"><option value="">All neighborhoods</option></select>
   <select id="period-filter" aria-label="Time of day"><option value="">Any time</option><option value="day">Daytime</option><option value="evening">Evening</option></select>
   <label><input id="saved-filter" type="checkbox">Saved</label>
   <label><input id="ended-filter" type="checkbox">Include finished</label>
-  <button class="action view-toggle" id="view-toggle" type="button">Show map</button>
+  <button class="action" id="clear-filters" type="button">Reset filters</button>
+  </div>
+  <button class="action" id="install-app" type="button">Install app</button>
 </div>
+<div id="install-help" hidden role="status">On iPhone: open in Safari, tap Share → Add to Home Screen → Open as Web App. On Android: use your browser menu → Install app or Add to Home screen. <button class="action" id="dismiss-install">Close</button></div>
 <div class="results"><span id="result-count" role="status"></span><details id="source-health"></details></div>
 <div class="layout">
   <aside id="sidebar"></aside>
@@ -984,6 +994,7 @@ if (bacPill) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 // Called here (after BAC section) so BAC_ACTIVE / BAC / bacVisible are defined.
 </script>
+<nav class="mobile-nav" aria-label="Browse weekend"><button data-view="list" aria-pressed="true">Explore</button><button data-view="map" aria-pressed="false">Map</button><button data-view="saved" aria-pressed="false">♡ Saved</button></nav>
 <script src="guide.js"></script>
 <script>switchCity('bangkok'); openSharedEvent();</script>
 </body>

@@ -197,12 +197,25 @@ def fetch_with_agentcash_firecrawl(url: str) -> str:
     return markdown
 
 
-def extract_activities(content: str, city_key: str, source: str = "Timeout") -> list[dict]:
-    api_key = os.environ.get("OPENROUTER_API_KEY")
+def surplus_api_key() -> str:
+    api_key = os.environ.get("SURPLUS_API_KEY")
+    # Task Scheduler can inherit an environment from before the key was saved.
+    if not api_key and sys.platform == "win32":
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as environment:
+                api_key = winreg.QueryValueEx(environment, "SURPLUS_API_KEY")[0]
+        except FileNotFoundError:
+            pass
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable not set.")
+        raise RuntimeError("SURPLUS_API_KEY is not set in the process or Windows user environment.")
+    return api_key
+
+
+def extract_activities(content: str, city_key: str, source: str = "Timeout") -> list[dict]:
+    api_key = surplus_api_key()
     city = CITIES[city_key]
-    print(f"  Asking DeepSeek to parse activities for {city['name']}...")
+    print(f"  Asking Surplus Intelligence (DeepSeek) to parse activities for {city['name']}...")
 
     prompt = f"""Parse {source} weekend activities for {city['name']}.
 
@@ -246,21 +259,49 @@ CONTENT:\n{content[:100000]}"""
     # the same clean markdown succeeds far more often than the scraper fallback.
     for attempt in range(1, 4):
         try:
+            started = time.monotonic()
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                "https://api.surplusintelligence.ai/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "deepseek/deepseek-v4-flash",
+                    "model": "deepseek-v4-flash",
+                    "providers_blocked": ["openrouter"],
+                    "provider": "deepseek",
+                    "thinking": {"type": "disabled"},
+                    "stream": True,
                     "max_tokens": 16384,
                     "messages": [{"role": "user", "content": prompt}],
                 },
                 timeout=180,
+                stream=True,
             )
-            resp.raise_for_status()
-            content = resp.json()["choices"][0]["message"].get("content")
+            # Streaming keeps long extraction responses from hitting gateway idle timeouts.
+            parts, finished = [], False
+            try:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if time.monotonic() - started > 240:
+                        raise ValueError("Surplus extraction exceeded four minutes")
+                    if not line.startswith(b"data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == b"[DONE]":
+                        break
+                    chunk = json.loads(data)
+                    if chunk.get("error"):
+                        raise ValueError("Surplus returned an error during streaming")
+                    for choice in chunk.get("choices", []):
+                        parts.append(choice.get("delta", {}).get("content") or "")
+                        if choice.get("finish_reason") == "stop":
+                            finished = True
+                if not finished:
+                    raise ValueError("Surplus response was interrupted or exceeded the output limit")
+            finally:
+                resp.close()
+            content = "".join(parts)
             if not content:
                 raise ValueError("model returned empty content")
 
@@ -275,7 +316,7 @@ CONTENT:\n{content[:100000]}"""
         except (requests.RequestException, ValueError) as e:
             print(f"  attempt {attempt}/3 failed: {e}")
             if attempt == 3:
-                raise RuntimeError(f"OpenRouter failed after 3 attempts: {e}") from e
+                raise RuntimeError(f"Surplus Intelligence failed after 3 attempts: {e}") from e
             time.sleep(5)
 
     # Sanitise

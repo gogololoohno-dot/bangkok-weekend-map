@@ -4,7 +4,7 @@ The static site uses `index.html`, `guide.js` and `guide.css`. Bangkok events an
 
 ## Friday updates
 
-Windows Task Scheduler task **BangkokWeekendUpdate** runs `uv run --with requests "C:\Users\punth\New folder\update_bangkok.py" --log` at 09:00 Asia/Bangkok on Friday, with Saturday and Sunday catch-up triggers. It uses the user's existing `OPENROUTER_API_KEY`. GitHub pushes trigger Vercel deployment. The laptop must be available for the scheduled job to run.
+Windows Task Scheduler task **BangkokWeekendUpdate** runs `uv run --with requests "C:\Users\punth\New folder\update_bangkok.py" --log` at 09:00 Asia/Bangkok on Friday, with Saturday and Sunday catch-up triggers. It uses `SURPLUS_API_KEY` from the process environment or Windows user environment (read directly if the scheduler has an older environment). All cities use Surplus Intelligence's `https://api.surplusintelligence.ai/v1/chat/completions` endpoint with `deepseek-v4-flash`, pinned to the direct DeepSeek provider through Surplus; OpenRouter is explicitly blocked as an upstream provider. Long responses use streaming with a four-minute per-attempt limit. No API key is stored in the repository. GitHub pushes trigger Vercel deployment. The laptop must be available for the scheduled job to run.
 
 The Bangkok collector reads Time Out, BK Magazine's current roundup, Bangkok Art City, River City and Eventpop through the existing Jina Reader integration. Collection failures are displayed in source health; they are not reported as zero events. No paid scraping fallback is used for Bangkok. River City and Eventpop were unavailable during the initial validation on 11 October 2026. Ticketmelon and other booking links are also discovered through editorial listings.
 

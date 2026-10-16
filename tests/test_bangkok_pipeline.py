@@ -19,6 +19,32 @@ VENUES = {'gallery': dict(name='Gallery', aliases=['The Gallery'], lat=13.73, ln
 
 
 class PipelineTests(unittest.TestCase):
+    def test_extraction_uses_surplus_and_blocks_openrouter(self):
+        with patch.object(updater, 'surplus_api_key', return_value='test-key'), patch.object(updater.requests, 'post') as post:
+            chunk = {'choices': [{'delta': {'content': '[{"title":"Example","cat":"art"}]'}, 'finish_reason':'stop'}]}
+            post.return_value.iter_lines.return_value = [b': keepalive', b'data: '+json.dumps(chunk).encode(), b'data: [DONE]']
+            events = updater.extract_activities('Public source text', 'bangkok')
+            self.assertEqual(events[0]['title'], 'Example')
+            self.assertEqual(post.call_args.args[0], 'https://api.surplusintelligence.ai/v1/chat/completions')
+            self.assertEqual(post.call_args.kwargs['headers']['Authorization'], 'Bearer test-key')
+            self.assertEqual(post.call_args.kwargs['json']['providers_blocked'], ['openrouter'])
+            self.assertEqual(post.call_args.kwargs['json']['provider'], 'deepseek')
+            self.assertEqual(post.call_args.kwargs['json']['model'], 'deepseek-v4-flash')
+            self.assertTrue(post.call_args.kwargs['stream'])
+
+    def test_interrupted_surplus_stream_is_not_accepted(self):
+        with patch.object(updater, 'surplus_api_key', return_value='test-key'), patch.object(updater.requests, 'post') as post, patch.object(updater.time, 'sleep'):
+            chunk = {'choices':[{'delta':{'content':'[]'}, 'finish_reason':'length'}]}
+            post.return_value.iter_lines.return_value = [b'data: '+json.dumps(chunk).encode(), b'data: [DONE]']
+            with self.assertRaisesRegex(RuntimeError, 'interrupted or exceeded'):
+                updater.extract_activities('Public source text', 'bangkok')
+            self.assertEqual(post.return_value.close.call_count, 3)
+
+    def test_surplus_key_does_not_fall_back_to_openrouter(self):
+        with patch.dict(updater.os.environ, {'OPENROUTER_API_KEY':'old-key'}, clear=True), patch.object(updater.sys, 'platform', 'linux'):
+            with self.assertRaisesRegex(RuntimeError, 'SURPLUS_API_KEY'):
+                updater.surplus_api_key()
+
     def clean(self, raw=None, venues=None):
         return b.clean_event(raw or RAW, 'Source', 'https://example.com', {URL}, venues or {}, NOW)
 
